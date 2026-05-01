@@ -119,6 +119,7 @@ runpod_train:
   ssh_port: 22
   vram_safety_factor: 1.15  # +15% marge VRAM
   disk_safety_factor: 1.30  # +30% marge disque
+  preferred_datacenter: EU-SE-1  # Suede, proche Belgique pour Mel
   # GPU + disk auto-selectionnes selon model.params (voir 'models' + 'gpu_pool')
 
 # === RunPod (serverless inference) ===
@@ -185,12 +186,15 @@ cloudflare_worker:
 
 # === Registre des modeles supportes ===
 models:
+  # disk_train_gb_min : peak realiste = base BF16 (~params*2 GB) + merged 16-bit save (~params*2 GB)
+  #                     + working (~5-10 GB). Cache HF est shared avec download donc pas double.
+  # Le 02_train.py applique disk_safety_factor (1.30 par defaut) sur ce minimum.
   gemma-4-31b:
     hf_id: google/gemma-4-31B-it
     params_b: 31
     family: gemma
     vram_train_gb_min: 40
-    disk_train_gb_min: 180
+    disk_train_gb_min: 130
     vram_infer_gb_min: 22
     disk_infer_gb_min: 30
   gemma-4-31b-mirror:
@@ -199,7 +203,7 @@ models:
     params_b: 31
     family: gemma
     vram_train_gb_min: 40
-    disk_train_gb_min: 180
+    disk_train_gb_min: 130
     vram_infer_gb_min: 22
     disk_infer_gb_min: 30
   gemma-4-26b-a4b:
@@ -207,7 +211,7 @@ models:
     params_b: 26
     family: gemma
     vram_train_gb_min: 35
-    disk_train_gb_min: 160
+    disk_train_gb_min: 110
     vram_infer_gb_min: 18
     disk_infer_gb_min: 28
   gemma-4-e4b:
@@ -215,7 +219,7 @@ models:
     params_b: 4
     family: gemma
     vram_train_gb_min: 8
-    disk_train_gb_min: 50
+    disk_train_gb_min: 30
     vram_infer_gb_min: 5
     disk_infer_gb_min: 12
   qwen-2.5-32b:
@@ -223,7 +227,7 @@ models:
     params_b: 32
     family: qwen
     vram_train_gb_min: 40
-    disk_train_gb_min: 180
+    disk_train_gb_min: 135
     vram_infer_gb_min: 22
     disk_infer_gb_min: 30
   qwen-2.5-14b:
@@ -231,7 +235,7 @@ models:
     params_b: 14
     family: qwen
     vram_train_gb_min: 22
-    disk_train_gb_min: 90
+    disk_train_gb_min: 65
     vram_infer_gb_min: 11
     disk_infer_gb_min: 18
   llama-3.3-70b:
@@ -239,7 +243,7 @@ models:
     params_b: 70
     family: llama
     vram_train_gb_min: 75
-    disk_train_gb_min: 400
+    disk_train_gb_min: 290
     vram_infer_gb_min: 50
     disk_infer_gb_min: 60
   llama-3.1-8b:
@@ -247,7 +251,7 @@ models:
     params_b: 8
     family: llama
     vram_train_gb_min: 12
-    disk_train_gb_min: 70
+    disk_train_gb_min: 40
     vram_infer_gb_min: 7
     disk_infer_gb_min: 15
   mistral-small-24b:
@@ -255,7 +259,7 @@ models:
     params_b: 24
     family: mistral
     vram_train_gb_min: 32
-    disk_train_gb_min: 140
+    disk_train_gb_min: 100
     vram_infer_gb_min: 18
     disk_infer_gb_min: 25
 

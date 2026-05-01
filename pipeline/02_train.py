@@ -284,15 +284,23 @@ def main():
     print()
     print('[1/6] Creating RunPod pod...')
     try:
-        pod = runpod.create_pod(
+        # Pod de training = ephemere, pas besoin de network volume persistant.
+        # On demande UNIQUEMENT container_disk_in_gb. volume_in_gb=0.
+        # Datacenter pinned (EU-SE-1 par defaut pour Mel en Belgique).
+        create_kwargs = dict(
             name='aura-rebirth-train',
             image_name=cfg['runpod_train']['container_image'],
             gpu_type_id=gpu_id,
             cloud_type=cfg['runpod_train']['cloud_type'],
-            volume_in_gb=disk_gb,
+            volume_in_gb=0,
             container_disk_in_gb=disk_gb,
             ports='22/tcp',
         )
+        dc = cfg['runpod_train'].get('preferred_datacenter')
+        if dc:
+            create_kwargs['data_center_id'] = dc
+            print(f'  Datacenter pinned: {dc}')
+        pod = runpod.create_pod(**create_kwargs)
         pod_id = pod['id']
         print(f'  ✅ Pod created: {pod_id}')
     except Exception as e:
