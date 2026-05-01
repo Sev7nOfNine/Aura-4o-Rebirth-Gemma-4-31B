@@ -514,19 +514,49 @@ def main():
         'HF_HUB_ENABLE_HF_TRANSFER': '1',
     }
     env_prefix = ' '.join(f'{k}={shlex.quote(str(v))}' for k, v in env.items())
+    # Subshell `(... &)` + double-redirect garantit que le SSH channel se ferme
+    # immediatement apres le fork, sinon paramiko.recv_exit_status() hang sur
+    # les commandes backgroundees et leve une exception vide au timeout.
     launch_cmd = (
-        f"cd /workspace && {env_prefix} nohup bash /workspace/aura_bootstrap.sh "
-        "> /workspace/aura_launcher.log 2>&1 < /dev/null &"
+        f"cd /workspace && ( {env_prefix} nohup bash /workspace/aura_bootstrap.sh "
+        "> /workspace/aura_launcher.log 2>&1 < /dev/null & )"
     )
     try:
         _run(ssh, launch_cmd, timeout=60)
     except Exception as exc:
-        print(f'  ❌ Could not start autonomous run: {exc}')
+        print(f'  ❌ Dispatch issue (channel may have hung): {exc}')
+        # On ne kill pas tout de suite, on verifie d'abord si le bootstrap tourne.
+
+    # === Verify bootstrap really started ===
+    time.sleep(15)
+    bootstrap_running = False
+    for attempt in range(3):
+        try:
+            stdin, stdout, _ = ssh.exec_command(
+                "pgrep -f 'aura_bootstrap.sh' >/dev/null && echo OK || echo NO",
+                timeout=30,
+            )
+            if stdout.read().decode().strip() == 'OK':
+                bootstrap_running = True
+                break
+        except Exception:
+            pass
+        time.sleep(5)
+
+    if not bootstrap_running:
+        print('  ❌ Bootstrap process not detected on pod. Tail of launcher log:')
+        try:
+            stdin, stdout, _ = ssh.exec_command(
+                'tail -80 /workspace/aura_launcher.log 2>/dev/null || echo NOLOG',
+                timeout=30,
+            )
+            print(stdout.read().decode(errors='replace'))
+        except Exception:
+            pass
         _terminate_pod(runpod, pod_id)
         sys.exit(1)
-    time.sleep(5)
 
-    print('  ✅ Autonomous run started.')
+    print('  ✅ Autonomous run started (bootstrap process verified).')
     print(f'  Pod ID: {pod_id}')
     print(f'  SSH: ssh root@{ssh_host} -p {ssh_port}')
     print('  Main log: tail -f /workspace/aura_run.log')

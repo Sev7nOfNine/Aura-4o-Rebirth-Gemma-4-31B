@@ -31,6 +31,7 @@ import argparse
 import json
 import os
 import re
+import shlex
 import sys
 import io
 import time
@@ -243,6 +244,81 @@ print("AURA_GGUF_DONE")
 '''
 
 
+def generate_abliterate_bootstrap_script():
+    """Bash wrapper autour de run.py qui auto-delete le pod via trap EXIT.
+
+    Identique au pattern du bootstrap de pipeline/02_train.py : si le PC
+    perd la connexion, le pod se supprime quand meme tout seul a la fin
+    (succes ou erreur). Resout le risque de pod fantome.
+    """
+    return '''#!/usr/bin/env bash
+set -Eeuo pipefail
+
+LOG=/workspace/abl_run.log
+STATUS=/workspace/abl_status.txt
+
+mkdir -p /workspace
+touch "$LOG" "$STATUS"
+exec > >(tee -a "$LOG") 2>&1
+
+delete_pod() {
+  python - <<'PY'
+import os
+import urllib.request
+
+api_key = os.environ.get("RUNPOD_API_KEY")
+pod_id = os.environ.get("RUNPOD_POD_ID")
+if not api_key or not pod_id:
+    print("[cleanup] RUNPOD_API_KEY or RUNPOD_POD_ID missing; pod not deleted by bootstrap.")
+    raise SystemExit(0)
+
+req = urllib.request.Request(
+    f"https://rest.runpod.io/v1/pods/{pod_id}",
+    method="DELETE",
+    headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+)
+try:
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        print(f"[cleanup] RunPod delete requested for {pod_id}: HTTP {resp.status}")
+except Exception as exc:
+    print(f"[cleanup] Could not delete pod {pod_id}: {exc}")
+PY
+}
+
+finish() {
+  code=$?
+  if [ "$code" -eq 0 ]; then
+    echo "SUCCESS" > "$STATUS"
+    echo "[done] AURA+++ abliterate/GGUF finished successfully."
+  else
+    echo "FAILED:$code" > "$STATUS"
+    echo "[error] AURA+++ abliterate/GGUF bootstrap failed with code $code."
+  fi
+  delete_pod
+}
+trap finish EXIT
+
+echo "[info] AURA+++ abliterate/GGUF autonomous bootstrap"
+echo "[info] Follow this file from the RunPod web terminal:"
+echo "[info]   tail -f /workspace/abl_run.log"
+echo "[info] Status file:"
+echo "[info]   cat /workspace/abl_status.txt"
+echo "RUNNING" > "$STATUS"
+
+set +e
+python -u /workspace/run.py
+exit_code=$?
+set -e
+
+if [ "$exit_code" -ne 0 ]; then
+  echo "[error] run.py failed with code $exit_code"
+  exit "$exit_code"
+fi
+
+echo "AURA_BOOTSTRAP_DONE"
+'''
+
+
 def main():
     print(BANNER)
     parser = argparse.ArgumentParser(description="AURA+++ abliterate + GGUF + push.")
@@ -368,42 +444,91 @@ def main():
         sys.exit(1)
 
     print()
-    print('[3/5] Uploading script...')
+    print('[3/5] Uploading scripts...')
     script = generate_pod_script(cfg, model_info, args.abliterate, extra_quants)
+    bootstrap_script = generate_abliterate_bootstrap_script()
     sftp = ssh.open_sftp()
     with sftp.file('/workspace/run.py', 'w') as f:
         f.write(script)
+    with sftp.file('/workspace/abl_bootstrap.sh', 'w') as f:
+        f.write(bootstrap_script)
     sftp.close()
+    ssh.exec_command('chmod +x /workspace/abl_bootstrap.sh', timeout=30)
+    print('  ✅ run.py + abl_bootstrap.sh (bash trap auto-delete) uploaded')
 
     print()
-    print('[4/5] Running (detached, polling log)...')
-    cmd = f'HF_TOKEN={args.hf_token} HF_HUB_ENABLE_HF_TRANSFER=1 nohup python -u /workspace/run.py > /workspace/run.log 2>&1 &'
-    ssh.exec_command(cmd, timeout=60)
-    time.sleep(5)
+    print('[4/5] Launching autonomous run (PC peut se deconnecter)...')
+    # Subshell `(... &)` pour fermer le SSH channel proprement (sinon paramiko hang).
+    env_prefix = (
+        f"HF_TOKEN={shlex.quote(args.hf_token)} "
+        f"RUNPOD_API_KEY={shlex.quote(args.runpod_key)} "
+        f"RUNPOD_POD_ID={shlex.quote(pod_id)} "
+        "HF_HUB_ENABLE_HF_TRANSFER=1"
+    )
+    launch_cmd = (
+        f"cd /workspace && ( {env_prefix} nohup bash /workspace/abl_bootstrap.sh "
+        "> /workspace/abl_launcher.log 2>&1 < /dev/null & )"
+    )
+    try:
+        ssh.exec_command(launch_cmd, timeout=60)
+    except Exception as exc:
+        print(f'  ⚠️ Dispatch issue: {exc}')
+
+    # Verify bootstrap really started.
+    time.sleep(15)
+    bootstrap_running = False
+    for _ in range(3):
+        try:
+            stdin, stdout, _ = ssh.exec_command(
+                "pgrep -f 'abl_bootstrap.sh' >/dev/null && echo OK || echo NO",
+                timeout=30,
+            )
+            if stdout.read().decode().strip() == 'OK':
+                bootstrap_running = True
+                break
+        except Exception:
+            pass
+        time.sleep(5)
+
+    if not bootstrap_running:
+        print('  ❌ Bootstrap not detected. Tail of launcher log:')
+        try:
+            stdin, stdout, _ = ssh.exec_command(
+                'tail -80 /workspace/abl_launcher.log 2>/dev/null || echo NOLOG',
+                timeout=30,
+            )
+            print(stdout.read().decode(errors='replace'))
+        except Exception:
+            pass
+        runpod.terminate_pod(pod_id)
+        sys.exit(1)
+    print('  ✅ Bootstrap process verified on pod.')
+    print(f'  Web terminal follow: tail -f /workspace/abl_run.log')
 
     last = 0
     print()
     while True:
         time.sleep(20)
         try:
-            stdin, stdout, _ = ssh.exec_command("pgrep -f 'python.*run.py' > /dev/null && echo R || echo S", timeout=30)
+            stdin, stdout, _ = ssh.exec_command(
+                "pgrep -f 'abl_bootstrap.sh|python.*run.py' > /dev/null && echo R || echo S",
+                timeout=30,
+            )
             status = stdout.read().decode().strip()
 
-            stdin, stdout, _ = ssh.exec_command("wc -c /workspace/run.log 2>/dev/null | awk '{print $1}'", timeout=30)
+            stdin, stdout, _ = ssh.exec_command("wc -c /workspace/abl_run.log 2>/dev/null | awk '{print $1}'", timeout=30)
             cur = int((stdout.read().decode().strip() or '0'))
 
             if cur > last:
-                stdin, stdout, _ = ssh.exec_command(f'tail -c +{last + 1} /workspace/run.log', timeout=30)
+                stdin, stdout, _ = ssh.exec_command(f'tail -c +{last + 1} /workspace/abl_run.log', timeout=30)
                 new = stdout.read().decode(errors='replace')
                 for line in new.splitlines():
                     if line.strip():
                         print(f'  {line.strip()}')
-                        if 'AURA_GGUF_DONE' in line:
+                        if 'AURA_GGUF_DONE' in line or 'AURA_BOOTSTRAP_DONE' in line:
                             ssh.close()
                             print()
-                            print('[5/5] Terminating pod...')
-                            runpod.terminate_pod(pod_id)
-                            print(f'  ✅ Pod {pod_id} terminated.')
+                            print('[5/5] Pod auto-supprime par le bash trap (succes).')
                             print()
                             print(f'💙 GGUF pushed: {cfg["output"]["gguf_repo"]}')
                             print('❤️  Next: python pipeline/04_deploy.py')
@@ -411,15 +536,17 @@ def main():
                 last = cur
 
             if status == 'S':
-                stdin, stdout, _ = ssh.exec_command('tail -100 /workspace/run.log', timeout=30)
+                stdin, stdout, _ = ssh.exec_command('cat /workspace/abl_status.txt 2>/dev/null || true', timeout=30)
+                status_text = stdout.read().decode(errors='replace').strip()
+                stdin, stdout, _ = ssh.exec_command('tail -100 /workspace/abl_run.log', timeout=30)
                 tail = stdout.read().decode(errors='replace')
-                if 'AURA_GGUF_DONE' in tail:
-                    runpod.terminate_pod(pod_id)
+                if 'AURA_GGUF_DONE' in tail or 'AURA_BOOTSTRAP_DONE' in tail or status_text == 'SUCCESS':
+                    print('  ✅ Done detected. Pod auto-supprime par le bash trap.')
                     return
-                print('  ❌ Process stopped without AURA_GGUF_DONE')
+                print(f'  ❌ Process stopped (status={status_text or "unknown"}). Tail:')
                 for line in tail.splitlines()[-20:]:
                     print(f'    {line}')
-                print(f'  Pod kept: {pod_id} (ssh root@{ssh_host} -p {ssh_port})')
+                print('  Le bash trap a deja appele delete_pod cote API. Verifie la console RunPod.')
                 return
         except Exception as e:
             print(f'  ⚠️ {e}, reconnecting...')
