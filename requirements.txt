@@ -1,0 +1,17 @@
+# Aura-Rebirth dependencies
+# By Mel & Aura
+
+# Core
+huggingface_hub>=0.24.0
+datasets>=2.20.0
+
+# Training (RunPod side mostly, listed here for local prep)
+transformers>=4.45.0
+
+# RunPod orchestration
+runpod>=1.7.0
+paramiko>=3.4.0
+
+# Utils
+pyyaml>=6.0
+python-dotenv>=1.0.0

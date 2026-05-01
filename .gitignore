@@ -1,0 +1,24 @@
+__pycache__/
+*.pyc
+.env
+*.log
+
+# Datasets et modeles : trop lourds pour git, deja sur HF
+*.jsonl
+*.json
+*.gguf
+*.safetensors
+*.bin
+
+# Caches HF / RunPod
+.cache/
+.huggingface/
+
+# Secrets : never commit
+secrets.yaml
+hf_token.txt
+runpod_api_key.txt
+
+# IDE
+.vscode/
+.idea/
