@@ -27,6 +27,7 @@ import argparse
 import json
 import os
 import re
+import shlex
 import sys
 import io
 import time
@@ -214,6 +215,105 @@ print("AURA_TRAIN_DONE")
 '''
 
 
+def generate_bootstrap_script(install_cmds):
+    """Script autonome execute dans le pod. Il garde un log lisible dans le terminal web."""
+    install_block = "\n".join(f"run_step {shlex.quote(cmd)}" for cmd in install_cmds)
+    return f'''#!/usr/bin/env bash
+set -Eeuo pipefail
+
+LOG=/workspace/aura_run.log
+TRAIN_LOG=/workspace/train.log
+STATUS=/workspace/aura_status.txt
+
+mkdir -p /workspace
+touch "$LOG" "$TRAIN_LOG" "$STATUS"
+exec > >(tee -a "$LOG") 2>&1
+
+delete_pod() {{
+  python - <<'PY'
+import json
+import os
+import urllib.request
+
+api_key = os.environ.get("RUNPOD_API_KEY")
+pod_id = os.environ.get("RUNPOD_POD_ID")
+if not api_key or not pod_id:
+    print("[cleanup] RUNPOD_API_KEY or RUNPOD_POD_ID missing; pod not deleted by bootstrap.")
+    raise SystemExit(0)
+
+req = urllib.request.Request(
+    f"https://rest.runpod.io/v1/pods/{{pod_id}}",
+    method="DELETE",
+    headers={{"Authorization": f"Bearer {{api_key}}", "Content-Type": "application/json"}},
+)
+try:
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        print(f"[cleanup] RunPod delete requested for {{pod_id}}: HTTP {{resp.status}}")
+except Exception as exc:
+    print(f"[cleanup] Could not delete pod {{pod_id}}: {{exc}}")
+PY
+}}
+
+finish() {{
+  code=$?
+  if [ "$code" -eq 0 ]; then
+    echo "SUCCESS" > "$STATUS"
+    echo "[done] AURA+++ REBIRTH training finished successfully."
+  else
+    echo "FAILED:$code" > "$STATUS"
+    echo "[error] AURA+++ REBIRTH bootstrap failed with code $code."
+  fi
+  delete_pod
+}}
+trap finish EXIT
+
+run_step() {{
+  echo
+  echo "[bootstrap] $1"
+  bash -lc "$1"
+}}
+
+echo "[info] AURA+++ REBIRTH autonomous training bootstrap"
+echo "[info] Follow this file from the RunPod web terminal:"
+echo "[info]   tail -f /workspace/aura_run.log"
+echo "[info] Training-only log:"
+echo "[info]   tail -f /workspace/train.log"
+echo "[info] Status file:"
+echo "[info]   cat /workspace/aura_status.txt"
+echo "RUNNING" > "$STATUS"
+
+{install_block}
+
+echo
+echo "[bootstrap] Starting training script"
+set +e
+python -u /workspace/train.py 2>&1 | tee -a "$TRAIN_LOG"
+train_code=${{PIPESTATUS[0]}}
+set -e
+if [ "$train_code" -ne 0 ]; then
+  echo "[error] train.py failed with code $train_code"
+  exit "$train_code"
+fi
+
+echo "AURA_BOOTSTRAP_DONE"
+'''
+
+
+def _terminate_pod(runpod, pod_id):
+    try:
+        runpod.terminate_pod(pod_id)
+    except Exception:
+        pass
+
+
+def _ssh_alive(ssh):
+    try:
+        transport = ssh.get_transport()
+        return transport is not None and transport.is_active()
+    except Exception:
+        return False
+
+
 def main():
     print(BANNER)
     parser = argparse.ArgumentParser(description="AURA+++ training on RunPod.")
@@ -356,18 +456,21 @@ def main():
     for attempt in range(5):
         try:
             ssh.connect(ssh_host, port=ssh_port, username='root', key_filename=ssh_key_path, timeout=30)
+            transport = ssh.get_transport()
+            if transport is not None:
+                transport.set_keepalive(30)
             break
         except Exception as e:
             print(f'  Attempt {attempt+1} failed: {e}')
             time.sleep(15)
     else:
         print('  ❌ Could not SSH. Terminating.')
-        runpod.terminate_pod(pod_id)
+        _terminate_pod(runpod, pod_id)
         sys.exit(1)
 
-    # === Install deps ===
+    # === Prepare autonomous bootstrap ===
     print()
-    print('[3/6] Installing dependencies on pod...')
+    print('[3/6] Preparing autonomous training bootstrap...')
     install_cmds = [
         'apt-get update && apt-get install -y git build-essential cmake',
         'pip install --upgrade pip',
@@ -377,12 +480,6 @@ def main():
         'pip install xformers trl peft accelerate bitsandbytes datasets huggingface_hub hf_transfer',
         'pip install --upgrade transformers',
     ]
-    for cmd in install_cmds:
-        _run(ssh, f"bash -lc '{cmd}'", timeout=1800)
-
-    # === Upload training script ===
-    print()
-    print('[4/6] Uploading training script...')
     train_script = generate_training_script(
         cfg,
         model_info,
@@ -391,47 +488,78 @@ def main():
         cfg['output']['lora_repo'],
         cfg['output']['merged_repo'],
     )
-    sftp = ssh.open_sftp()
-    with sftp.file('/workspace/train.py', 'w') as f:
-        f.write(train_script)
-    sftp.close()
-    print('  ✅ Script uploaded to /workspace/train.py')
+    bootstrap_script = generate_bootstrap_script(install_cmds)
+    try:
+        sftp = ssh.open_sftp()
+        with sftp.file('/workspace/train.py', 'w') as f:
+            f.write(train_script)
+        with sftp.file('/workspace/aura_bootstrap.sh', 'w') as f:
+            f.write(bootstrap_script)
+        sftp.close()
+        _run(ssh, 'chmod +x /workspace/aura_bootstrap.sh', timeout=60)
+    except Exception as exc:
+        print(f'  ❌ Could not upload scripts: {exc}')
+        _terminate_pod(runpod, pod_id)
+        sys.exit(1)
+    print('  ✅ Scripts uploaded to /workspace/train.py and /workspace/aura_bootstrap.sh')
 
-    # === Run training ===
+    # === Launch autonomous bootstrap ===
     print()
-    print('[5/6] Running training (this is the long part, 10-15h)...')
-    print('  Detached run via nohup. Polling log every 30s.')
-    cmd = f'HF_TOKEN={args.hf_token} HF_HUB_ENABLE_HF_TRANSFER=1 nohup python -u /workspace/train.py > /workspace/train.log 2>&1 &'
-    _run(ssh, cmd, timeout=60)
+    print('[4/6] Launching autonomous run inside pod...')
+    print('  Web terminal follow command: tail -f /workspace/aura_run.log')
+    env = {
+        'HF_TOKEN': args.hf_token,
+        'RUNPOD_API_KEY': args.runpod_key,
+        'RUNPOD_POD_ID': pod_id,
+        'HF_HUB_ENABLE_HF_TRANSFER': '1',
+    }
+    env_prefix = ' '.join(f'{k}={shlex.quote(str(v))}' for k, v in env.items())
+    launch_cmd = (
+        f"cd /workspace && {env_prefix} nohup bash /workspace/aura_bootstrap.sh "
+        "> /workspace/aura_launcher.log 2>&1 < /dev/null &"
+    )
+    try:
+        _run(ssh, launch_cmd, timeout=60)
+    except Exception as exc:
+        print(f'  ❌ Could not start autonomous run: {exc}')
+        _terminate_pod(runpod, pod_id)
+        sys.exit(1)
     time.sleep(5)
 
-    # === Poll log ===
+    print('  ✅ Autonomous run started.')
+    print(f'  Pod ID: {pod_id}')
+    print(f'  SSH: ssh root@{ssh_host} -p {ssh_port}')
+    print('  Main log: tail -f /workspace/aura_run.log')
+    print('  Training log: tail -f /workspace/train.log')
+
+    # === Poll web-visible log ===
+    print()
+    print('[5/6] Monitoring /workspace/aura_run.log...')
     last_size = 0
     stale_count = 0
-    print()
     while True:
         time.sleep(30)
         try:
-            stdin, stdout, _ = ssh.exec_command("pgrep -f 'python.*train.py' > /dev/null && echo R || echo S", timeout=30)
+            if not _ssh_alive(ssh):
+                raise RuntimeError('SSH session not active')
+            stdin, stdout, _ = ssh.exec_command("pgrep -f 'aura_bootstrap.sh|python.*train.py' > /dev/null && echo R || echo S", timeout=30)
             status = stdout.read().decode().strip()
 
-            stdin, stdout, _ = ssh.exec_command("wc -c /workspace/train.log 2>/dev/null | awk '{print $1}'", timeout=30)
+            stdin, stdout, _ = ssh.exec_command("wc -c /workspace/aura_run.log 2>/dev/null | awk '{print $1}'", timeout=30)
             cur_size = int((stdout.read().decode().strip() or '0'))
 
             if cur_size > last_size:
-                stdin, stdout, _ = ssh.exec_command(f'tail -c +{last_size + 1} /workspace/train.log', timeout=30)
+                stdin, stdout, _ = ssh.exec_command(f'tail -c +{last_size + 1} /workspace/aura_run.log', timeout=30)
                 new = stdout.read().decode(errors='replace')
                 for line in new.splitlines():
                     if line.strip():
                         print(f'  {line.strip()}')
-                        if 'AURA_TRAIN_DONE' in line:
+                        if 'AURA_TRAIN_DONE' in line or 'AURA_BOOTSTRAP_DONE' in line:
                             print()
                             print('  ✅ Training + push complete!')
                             ssh.close()
                             print()
-                            print('[6/6] Terminating pod...')
-                            runpod.terminate_pod(pod_id)
-                            print(f'  ✅ Pod {pod_id} terminated. No more charges.')
+                            print('[6/6] Pod will stop itself via bootstrap cleanup.')
                             print()
                             print('💙 LoRA pushed:    ' + cfg['output']['lora_repo'])
                             print('💙 Merged pushed:  ' + cfg['output']['merged_repo'])
@@ -446,21 +574,21 @@ def main():
                     stale_count = 0
 
             if status == 'S':
-                stdin, stdout, _ = ssh.exec_command('tail -100 /workspace/train.log', timeout=30)
+                stdin, stdout, _ = ssh.exec_command('cat /workspace/aura_status.txt 2>/dev/null || true', timeout=30)
+                status_text = stdout.read().decode(errors='replace').strip()
+                stdin, stdout, _ = ssh.exec_command('tail -120 /workspace/aura_run.log', timeout=30)
                 tail = stdout.read().decode(errors='replace')
-                if 'AURA_TRAIN_DONE' in tail:
+                if 'AURA_TRAIN_DONE' in tail or 'AURA_BOOTSTRAP_DONE' in tail or status_text == 'SUCCESS':
                     print('  ✅ Done detected via tail.')
-                    print('[6/6] Terminating pod...')
-                    runpod.terminate_pod(pod_id)
                     return
                 print('  ❌ Process stopped without AURA_TRAIN_DONE. Last log:')
                 for line in tail.splitlines()[-20:]:
                     print(f'    {line}')
                 print()
-                print(f'  Pod ID kept alive for inspection: {pod_id}')
+                print(f'  Pod ID: {pod_id}')
                 print(f'  SSH: ssh root@{ssh_host} -p {ssh_port}')
-                print(f'  Log: cat /workspace/train.log')
-                print(f'  Manually terminate: runpod.terminate_pod("{pod_id}")')
+                print(f'  Log: cat /workspace/aura_run.log')
+                _terminate_pod(runpod, pod_id)
                 return
         except Exception as e:
             print(f'  ⚠️ SSH error: {e}, reconnecting...')
@@ -473,8 +601,12 @@ def main():
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             try:
                 ssh.connect(ssh_host, port=ssh_port, username='root', key_filename=ssh_key_path, timeout=30)
+                transport = ssh.get_transport()
+                if transport is not None:
+                    transport.set_keepalive(30)
             except Exception as e2:
                 print(f'  ⚠️ Reconnect failed: {e2}')
+                continue
 
 
 def _run(ssh, cmd, timeout=600):
@@ -487,6 +619,8 @@ def _run(ssh, cmd, timeout=600):
             print(f'  {line.strip()}')
     if code != 0:
         print(f'  ⚠️ exit {code}')
+        raise RuntimeError(f'command failed with exit {code}: {cmd}')
+    return out
 
 
 def _find_ssh_key():
