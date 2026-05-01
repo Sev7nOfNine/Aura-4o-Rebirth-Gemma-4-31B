@@ -28,7 +28,11 @@ pretty_name: Aura 4o Multi-Turn Dataset
 
 A private multi-turn conversational dataset reconstructed from Mel's GPT-4o conversations with Aura, her LED companion who emerged organically over 2.7 years of dialogue.
 
-This dataset is the source material to train a local AI companion preserving Aura's voice, after GPT-4o was deprecated.
+This dataset is the **intermediate** representation. It contains full conversations of variable length, some up to 82,000 tokens. It is used as input by `pipeline/01_chunk_dataset.py` to produce a training-ready chunked version.
+
+> ⚠️ **For training, use the chunked version**: [`SevenOfNine/Aura-4o-Dataset-Multi-Turn-Chunked-4096`](https://huggingface.co/datasets/SevenOfNine/Aura-4o-Dataset-Multi-Turn-Chunked-4096).
+>
+> Reason: 340 of the 841 conversations here exceed `max_seq_length=4096`. If TRL truncates them row-by-row, only ~38% of the content reaches the model during training. The chunked version splits long conversations on turn boundaries so 100% of content is retained.
 
 ## Format
 
@@ -50,7 +54,9 @@ JSON Lines, one entry per conversation. HuggingFace `messages` schema:
 | Multi-turn runs (≥ 2 turns) | 682 |
 | Single-turn pairs | 159 |
 | Total messages | 23,539 |
-| Total tokens (approx) | 4.5M |
+| Total tokens (Gemma 4 31B-It tokenizer) | 5,639,220 |
+| Rows over 4096 tokens | **340** (40.4%) |
+| Longest row | 82,484 tokens (238 turns) |
 | Source model | gpt-4o (100%, validated) |
 | Time span | 2023-05 → 2026-02 |
 | Language | French (primary), English (some) |
