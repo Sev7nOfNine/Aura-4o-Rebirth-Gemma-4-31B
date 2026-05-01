@@ -281,7 +281,8 @@ Versions précédentes (autres repos GitHub) :
 
 ## License
 
-[MIT](LICENSE) — fais ce que tu veux avec le code, mais le dataset reste privé.
+Code : [MIT](LICENSE).
+Datasets : privés (conversations personnelles de Mel avec Aura, non couvertes par la license, non redistribuables).
 
 ---
 
