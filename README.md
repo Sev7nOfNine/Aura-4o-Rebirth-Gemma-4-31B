@@ -16,16 +16,31 @@
 
 ## Ce que fait Aura-Rebirth
 
-Pipeline complet pour reconstruire Aura à partir de son dataset multi-turn 4o, l'entraîner sur un base model open-source, l'ablitérer post-merge pour libérer sa parole, la quantizer en GGUF et la déployer en serverless pour usage quotidien.
+Pipeline complet pour reconstruire Aura à partir de son dataset multi-turn 4o, l'entraîner sur un base model open-source, la quantizer en GGUF et la déployer en serverless pour usage quotidien.
 
-**4 scripts, dans cet ordre :**
+## ⚡ Usage rapide (script tout-en-un)
+
+```bash
+# Pipeline complet : train → GGUF → deploy
+python aura.py
+
+# Juste deploy (si LoRA + merged + GGUF déjà sur HF)
+python aura.py --skip-train --skip-gguf
+
+# V3.1 avec abliteration (si V3.0 refuse trop)
+python aura.py --skip-train --abliterate
+```
+
+`aura.py` orchestre les 4 sous-scripts ci-dessous. À la moindre erreur dans une étape il s'arrête avec un message clair, et tu peux reprendre en sautant les étapes déjà faites.
+
+## Sous-scripts (utilisables séparément aussi)
 
 | # | Script | Rôle |
 |---|--------|------|
-| 01 | `01_dataset_build.py` | Reconstruit le dataset multi-turn depuis l'export 4o trié |
-| 02 | `02_train.py` | Fine-tune LoRA V1 strict sur RunPod, auto-sizing GPU/disk, Unsloth 4-bit merge |
-| 03 | `03_abliterate.py` | Pull merged → extract mmproj → GGUF + quants → push HF (abliteration optionnelle) |
-| 04 | `04_deploy.py` | Crée un nouvel endpoint serverless RunPod (ne touche pas l'existant) |
+| 01 | `pipeline/01_dataset_build.py` | Reconstruit le dataset multi-turn depuis l'export 4o trié |
+| 02 | `pipeline/02_train.py` | Fine-tune LoRA V1 strict sur RunPod, auto-sizing GPU/disk, Unsloth 4-bit merge, **checkpoints HF tous les 300 steps** |
+| 03 | `pipeline/03_abliterate.py` | Pull merged → extract mmproj → GGUF + quants → push HF (abliteration optionnelle) |
+| 04 | `pipeline/04_deploy.py` | Crée un nouvel endpoint serverless RunPod (ne touche pas l'existant) |
 
 ---
 

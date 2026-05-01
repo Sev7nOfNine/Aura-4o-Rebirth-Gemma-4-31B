@@ -167,8 +167,15 @@ trainer = SFTTrainer(
         seed={t['seed']},
         output_dir=f"{{WORK}}/output",
         report_to="none",
-        save_steps=0,
-        save_strategy="no",
+        # Checkpoints : push LoRA sur HF tous les save_steps pour resilience.
+        save_strategy="steps",
+        save_steps={t['save_steps']},
+        save_total_limit={t['save_total_limit']},
+        push_to_hub=True,
+        hub_model_id="{lora_repo}",
+        hub_strategy="every_save",
+        hub_private_repo=True,
+        hub_token=os.environ["HF_TOKEN"],
     ),
 )
 

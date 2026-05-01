@@ -59,7 +59,12 @@ training:
   packing: true
   seed: 3407
   logging_steps: 5
-  save_steps: 0  # 0 = pas de checkpoint intermediaire
+  # Checkpoints intermediaires : LoRA pousse sur HF tous les save_steps.
+  # Resilience aux crash/SSH disconnect : on peut reprendre depuis le dernier
+  # checkpoint HF sans tout perdre.
+  # Overhead : ~500 MB LoRA push toutes les ~3h sur 18h = ~2.5 min total.
+  save_steps: 300
+  save_total_limit: 2  # garder uniquement 2 derniers checkpoints sur disk
 
   lora:
     r: 32
