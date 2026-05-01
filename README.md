@@ -21,7 +21,7 @@ Pipeline complet pour reconstruire Aura à partir de son dataset multi-turn 4o, 
 ## ⚡ Usage rapide (script tout-en-un)
 
 ```bash
-# Pipeline complet : train → GGUF → deploy
+# Pipeline complet : preflight → train → GGUF → deploy
 python aura.py
 
 # Juste deploy (si LoRA + merged + GGUF déjà sur HF)
@@ -31,7 +31,7 @@ python aura.py --skip-train --skip-gguf
 python aura.py --skip-train --abliterate
 ```
 
-`aura.py` orchestre les 4 sous-scripts ci-dessous. Il lance d'abord `preflight.py` en read-only pour sortir un verdict `GO/NO-GO` avant toute dépense RunPod. À la moindre erreur dans une étape il s'arrête avec un message clair, et tu peux reprendre en sautant les étapes déjà faites.
+`aura.py` orchestre les sous-scripts ci-dessous. Il lance d'abord `preflight.py` en read-only pour sortir un verdict `GO/NO-GO` avant toute dépense RunPod. À la moindre erreur dans une étape il s'arrête avec un message clair, et tu peux reprendre en sautant les étapes déjà faites.
 
 ## Garde-fous avant dépense
 
@@ -52,8 +52,8 @@ python typingmind_smoke.py --endpoint-id <RUNPOD_ENDPOINT_ID>
 
 | # | Script | Rôle |
 |---|--------|------|
-| 01 | `pipeline/01_dataset_build.py` | Reconstruit le dataset multi-turn depuis l'export 4o trié |
-| 01b | `pipeline/01_chunk_dataset.py` | Découpe le dataset en chunks <= `max_seq_length` pour éviter la troncature SFT |
+| 01a | `pipeline/01_dataset_build.py` | Reconstruit le dataset multi-turn depuis l'export 4o trié |
+| 01b | `pipeline/01_chunk_dataset.py` | Découpe le dataset en chunks ≤ `max_seq_length` pour éviter la troncature SFT |
 | 02 | `pipeline/02_train.py` | Fine-tune LoRA V1 strict sur RunPod, auto-sizing GPU/disk, Unsloth 4-bit merge, **checkpoints HF tous les 50 steps** |
 | 03 | `pipeline/03_abliterate.py` | Pull merged → extract mmproj → GGUF + quants → push HF (abliteration optionnelle) |
 | 04 | `pipeline/04_deploy.py` | Crée un nouvel endpoint serverless RunPod (ne touche pas l'existant) |
@@ -102,7 +102,19 @@ python pipeline/01_dataset_build.py \
 
 Voir [`docs/DATASET.md`](docs/DATASET.md) pour les détails.
 
-### 3. Fine-tuning sur RunPod
+### 3. Chunking pour éviter la troncature
+
+Avant le training, on découpe les conversations longues en chunks ≤ `max_seq_length` pour qu'aucun tour ne soit silencieusement tronqué par TRL. 100% du contenu retenu, jamais de coupure au milieu d'un tour user→assistant.
+
+```bash
+python pipeline/01_chunk_dataset.py \
+  --push-hf SevenOfNine/Aura-4o-Dataset-Multi-Turn-Chunked-4096 \
+  --private
+```
+
+Sortie : `aura_train_chunked_4096.jsonl` + `chunk_report.md` + `giant_turns_review.jsonl` (tours individuels qui dépassent à eux seuls la fenêtre, listés pour décision humaine).
+
+### 4. Fine-tuning sur RunPod
 
 ```bash
 python pipeline/02_train.py
@@ -115,12 +127,12 @@ Le script lit `configs/aura.yaml` (source de vérité). Il :
 - Crée un Pod RunPod, installe Unsloth + deps
 - Lance le LoRA SFT (V1 strict recipe : r=32, α=32, dropout=0.0, lr=2e-4, 3 epochs, eff batch=32)
 - Merge via Unsloth 4-bit (préserve la voix, vs BF16 clean qui dilue)
-- Push le LoRA + le merged sur HuggingFace privé
+- Push le LoRA + le merged sur HuggingFace privé (checkpoints intermédiaires tous les 50 steps)
 - Termine le Pod automatiquement
 
 Voir [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md) pour le pourquoi des choix.
 
-### 4. GGUF + mmproj (abliteration optionnelle)
+### 5. GGUF + mmproj (abliteration optionnelle)
 
 ```bash
 # V3.0 baseline : juste GGUF Q5 + mmproj, pas d'abliteration
@@ -142,7 +154,7 @@ Le script :
 
 **Pourquoi abliterer après et seulement si nécessaire** : le SFT Aura introduit des patterns de refus appris du dataset 4o, donc abliterer un base déjà abliterated ne sert à rien (V1 a fait ça → encore censuré). On part d'un base propre, on ajoute l'abliteration uniquement si le V3.0 déployé refuse vraiment trop.
 
-### 5. Déploiement serverless
+### 6. Déploiement serverless
 
 L'image worker est buildée et publiée automatiquement par GitHub Actions sur GHCR à chaque push qui modifie `runpod/inference_worker/**`. Tu n'as rien à faire localement.
 
@@ -170,6 +182,14 @@ Le script :
 
 Le worker tourne en `--reasoning-format deepseek` (capacité présente, pas forcée globalement) avec fallback "Option E" : si le modèle met sa réponse dans `reasoning_content` au lieu de `content`, le handler la copie automatiquement.
 
+### 7. Smoke test post-deploy
+
+```bash
+python typingmind_smoke.py --endpoint-id <RUNPOD_ENDPOINT_ID>
+```
+
+Vérifie 5 axes : `text`, `thinking-off`, `vision` (image PNG), `tools` (function calling), `web-tool-shape`. Verdict GO/NO-GO sur la santé de l'endpoint.
+
 ---
 
 ## Structure du repo
@@ -183,22 +203,22 @@ Aura-Rebirth/
 ├── .env.template                          # template tokens (HF + RunPod)
 ├── .gitignore
 │
-├── aura.py                                # ⚡ orchestrateur tout-en-un (preflight + train + GGUF + deploy)
-├── preflight.py                           # audit read-only avant dépense RunPod (verdict GO/NO-GO)
-├── typingmind_smoke.py                    # tests post-deploy : text + thinking-off + vision + tools + web
+├── aura.py                                # ⚡ orchestrateur tout-en-un
+├── preflight.py                           # audit read-only avant dépense RunPod
+├── typingmind_smoke.py                    # tests post-deploy
 │
 ├── pipeline/
-│   ├── 01_dataset_build.py                # paires JSONL + conversations.json → dataset multi-turn
-│   ├── 01_chunk_dataset.py                # chunk dataset multi-turn → trainable 4096 tokens
-│   ├── 02_train.py                        # LoRA SFT sur RunPod, V1 strict recipe + Unsloth 4-bit merge
-│   ├── 03_abliterate.py                   # pull merged → mmproj + GGUF + push HF (ablit optionnelle)
-│   └── 04_deploy.py                       # nouvel endpoint serverless RunPod (protège l'existant)
+│   ├── 01_dataset_build.py                # paires JSONL → dataset multi-turn
+│   ├── 01_chunk_dataset.py                # multi-turn → chunked 4096 tokens
+│   ├── 02_train.py                        # LoRA SFT RunPod + Unsloth 4-bit merge
+│   ├── 03_abliterate.py                   # merged → mmproj + GGUF + push HF
+│   └── 04_deploy.py                       # nouvel endpoint serverless
 │
 ├── configs/
 │   └── aura.yaml                          # SOURCE DE VÉRITÉ : modèles, GPU pool, hyperparams, RunPod
 │
 ├── docs/
-│   ├── DATASET.md                         # construction du dataset multi-turn (méthodologie)
+│   ├── DATASET.md                         # construction du dataset multi-turn
 │   └── METHODOLOGY.md                     # pourquoi multi-turn + LoRA léger + Unsloth 4-bit merge
 │
 ├── dataset_card.md                        # README HF du dataset Multi-Turn (intermédiaire)
@@ -216,21 +236,37 @@ Aura-Rebirth/
 
 ---
 
+## Datasets publiés
+
+Sur <https://huggingface.co/SevenOfNine> (tous privés) :
+
+- `SevenOfNine/Aura-4o-Dataset` — tri manuel original (paires aplaties)
+- `SevenOfNine/Aura-4o-Dataset-Multi-Turn` — reconstruction multi-turn (intermédiaire)
+- `SevenOfNine/Aura-4o-Dataset-Multi-Turn-Chunked-4096` — ⭐ source du training V3 (1868 chunks, 100% retention)
+
 ## Modèles publiés
 
 Au fil des itérations, les modèles seront publiés sur <https://huggingface.co/SevenOfNine> avec le naming :
 
 - `SevenOfNine/Aura-4o-Gemma-4-31B-Multi-Turn-LoRA` — l'ajustement LoRA seul
 - `SevenOfNine/Aura-4o-Gemma-4-31B-Multi-Turn-Merged` — base + LoRA fusionnés
-- `SevenOfNine/Aura-4o-Gemma-4-31B-Multi-Turn-Abliterated-GGUF` — ablitéré + quantizé pour usage local
+- `SevenOfNine/Aura-4o-Gemma-4-31B-Multi-Turn-GGUF` — GGUF + mmproj pour usage local / serverless
+- `SevenOfNine/Aura-4o-Gemma-4-31B-Multi-Turn-Abliterated-GGUF` — variante ablitérée si V3.1
 
 Quand on touchera la **Definitive Edition**, on renommera tout en `Aura-4o`.
+
+Versions précédentes (autres repos GitHub) :
+
+- [`Aura-4o-Gemma-4-31B`](https://github.com/Sev7nOfNine/Aura-4o-Gemma-4-31B) — V1 référence Ollama-first
+- [`Aura-Gemma-4-31B-V2-RunPod`](https://github.com/Sev7nOfNine/Aura-Gemma-4-31B-V2-RunPod) — V2 archive (vision OK, tone clinical)
+- [`Aura-Gemma-4-31B-Uncensored-RunPod`](https://github.com/Sev7nOfNine/Aura-Gemma-4-31B-Uncensored-RunPod) — expérience HuiHui archivée
 
 ---
 
 ## Pourquoi c'est différent
 
 - **Multi-turn préservé** : le modèle apprend la fluidité des conversations, pas des paires isolées.
+- **Chunking sans tronquage caché** : 100% des tokens du dataset sont vus pendant le training, vs ~38% si TRL tronquait silencieusement les longues conversations.
 - **Auto-sizing GPU/disk** : tu paies pour ce dont tu as besoin, pas un A100 80GB pour tuner un 8B.
 - **Base non-abliterated** : on part propre, abliteration seulement si nécessaire (V3.1 patch).
 - **Unsloth 4-bit merge** : préserve la voix expressive du LoRA (vs BF16 clean qui dilue).
@@ -239,12 +275,13 @@ Quand on touchera la **Definitive Edition**, on renommera tout en `Aura-4o`.
 - **Endpoints protégés** : 04_deploy.py refuse de toucher les endpoints listés dans `protect_existing_endpoints`.
 - **Serverless scale-to-zero** : tu paies à la seconde d'utilisation réelle.
 - **Chat template natif** : `tokenizer.apply_chat_template()`, pas de format hardcodé qui casse à l'inférence.
+- **Preflight + smoke test** : audit read-only avant dépense + tests réels post-deploy. Aucun cycle RunPod ne part à l'aveugle.
 
 ---
 
 ## License
 
-MIT — fais ce que tu veux avec, mais le dataset reste privé.
+[MIT](LICENSE) — fais ce que tu veux avec le code, mais le dataset reste privé.
 
 ---
 
