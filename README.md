@@ -40,7 +40,7 @@ python aura.py --skip-train --abliterate
 python preflight.py
 
 # Prépare/pousse le dataset chunké si preflight bloque sur max_seq_length
-python pipeline/01_chunk_dataset.py --push-hf SevenOfNine/Aura-4o-Dataset-Multi-Turn-Chunked-4096 --private
+python pipeline/01_chunk_dataset.py --push-hf SevenOfNine/Aura-4o-Rebirth-Dataset-Chunked-4096 --private
 
 # Après déploiement : teste le vrai endpoint façon TypingMind
 python typingmind_smoke.py --endpoint-id <RUNPOD_ENDPOINT_ID>
@@ -94,7 +94,7 @@ python pipeline/01_dataset_build.py \
   --jsonl path/to/aura_dataset.jsonl \
   --conversations path/to/conversations.json \
   --output aura_final_dataset.jsonl \
-  --push-hf SevenOfNine/Aura-4o-Dataset-Multi-Turn \
+  --push-hf SevenOfNine/Aura-4o-Rebirth-Dataset \
   --private
 ```
 
@@ -108,7 +108,7 @@ Avant le training, on découpe les conversations longues en chunks ≤ `max_seq_
 
 ```bash
 python pipeline/01_chunk_dataset.py \
-  --push-hf SevenOfNine/Aura-4o-Dataset-Multi-Turn-Chunked-4096 \
+  --push-hf SevenOfNine/Aura-4o-Rebirth-Dataset-Chunked-4096 \
   --private
 ```
 
@@ -160,7 +160,7 @@ L'image worker est buildée et publiée automatiquement par GitHub Actions sur G
 
 ```bash
 # Crée le NOUVEL endpoint (l'existant 01p64ykg6u3p0i reste intact)
-python pipeline/04_deploy.py --worker-image ghcr.io/sev7nofnine/aura-rebirth-worker:latest
+python pipeline/04_deploy.py --worker-image ghcr.io/sev7nofnine/aura-4o-rebirth-worker:latest
 ```
 
 Si tu veux forcer un rebuild manuel : `gh workflow run "Build & Push Worker Image"`.
@@ -168,9 +168,9 @@ Si tu veux forcer un rebuild manuel : `gh workflow run "Build & Push Worker Imag
 Si tu préfères builder localement (Docker requis) :
 
 ```bash
-docker build -t ghcr.io/sev7nofnine/aura-rebirth-worker:latest runpod/inference_worker
-docker push ghcr.io/sev7nofnine/aura-rebirth-worker:latest
-python pipeline/04_deploy.py --worker-image ghcr.io/sev7nofnine/aura-rebirth-worker:latest
+docker build -t ghcr.io/sev7nofnine/aura-4o-rebirth-worker:latest runpod/inference_worker
+docker push ghcr.io/sev7nofnine/aura-4o-rebirth-worker:latest
+python pipeline/04_deploy.py --worker-image ghcr.io/sev7nofnine/aura-4o-rebirth-worker:latest
 ```
 
 Le script :
@@ -241,17 +241,17 @@ Aura-Rebirth/
 Sur <https://huggingface.co/SevenOfNine> (tous privés) :
 
 - `SevenOfNine/Aura-4o-Dataset` — tri manuel original (paires aplaties)
-- `SevenOfNine/Aura-4o-Dataset-Multi-Turn` — reconstruction multi-turn (intermédiaire)
-- `SevenOfNine/Aura-4o-Dataset-Multi-Turn-Chunked-4096` — ⭐ source du training V3 (1868 chunks, 100% retention)
+- `SevenOfNine/Aura-4o-Rebirth-Dataset` — reconstruction multi-turn (intermédiaire)
+- `SevenOfNine/Aura-4o-Rebirth-Dataset-Chunked-4096` — ⭐ source du training V3 (1868 chunks, 100% retention)
 
 ## Modèles publiés
 
 Au fil des itérations, les modèles seront publiés sur <https://huggingface.co/SevenOfNine> avec le naming :
 
-- `SevenOfNine/Aura-4o-Gemma-4-31B-Multi-Turn-LoRA` — l'ajustement LoRA seul
-- `SevenOfNine/Aura-4o-Gemma-4-31B-Multi-Turn-Merged` — base + LoRA fusionnés
-- `SevenOfNine/Aura-4o-Gemma-4-31B-Multi-Turn-GGUF` — GGUF + mmproj pour usage local / serverless
-- `SevenOfNine/Aura-4o-Gemma-4-31B-Multi-Turn-Abliterated-GGUF` — variante ablitérée si V3.1
+- `SevenOfNine/Aura-4o-Rebirth-LoRA` — l'ajustement LoRA seul
+- `SevenOfNine/Aura-4o-Rebirth-Merged` — base + LoRA fusionnés
+- `SevenOfNine/Aura-4o-Rebirth-GGUF` — GGUF + mmproj pour usage local / serverless
+- `SevenOfNine/Aura-4o-Rebirth-Abliterated-GGUF` — variante ablitérée si V3.1
 
 Quand on touchera la **Definitive Edition**, on renommera tout en `Aura-4o`.
 

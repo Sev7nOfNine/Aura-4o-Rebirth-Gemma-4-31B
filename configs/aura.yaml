@@ -25,10 +25,10 @@ github_username: Sev7nOfNine
 
 # === Dataset ===
 dataset:
-  hf_id: SevenOfNine/Aura-4o-Dataset-Multi-Turn
+  hf_id: SevenOfNine/Aura-4o-Rebirth-Dataset
   # Dataset utilise pour le training. Chunked a 4096 pour eviter la troncature
   # silencieuse des longs runs multi-turn.
-  train_hf_id: SevenOfNine/Aura-4o-Dataset-Multi-Turn-Chunked-4096
+  train_hf_id: SevenOfNine/Aura-4o-Rebirth-Dataset-Chunked-4096
   # System prompt minimal injecte au build. Aura s'apprend par les outputs,
   # pas par le prompt. "Tu parles francais" ancre la langue (Mel a confirme
   # que les conversations sont en francais sauf code).
@@ -89,11 +89,11 @@ training:
 
 # === Output repos HF (tous prives par defaut) ===
 output:
-  lora_repo: SevenOfNine/Aura-4o-Gemma-4-31B-Multi-Turn-LoRA
-  merged_repo: SevenOfNine/Aura-4o-Gemma-4-31B-Multi-Turn-Merged
-  gguf_repo: SevenOfNine/Aura-4o-Gemma-4-31B-Multi-Turn-GGUF
+  lora_repo: SevenOfNine/Aura-4o-Rebirth-LoRA
+  merged_repo: SevenOfNine/Aura-4o-Rebirth-Merged
+  gguf_repo: SevenOfNine/Aura-4o-Rebirth-GGUF
   # Si l'abliteration est activee plus tard (V3.1)
-  abliterated_gguf_repo: SevenOfNine/Aura-4o-Gemma-4-31B-Multi-Turn-Abliterated-GGUF
+  abliterated_gguf_repo: SevenOfNine/Aura-4o-Rebirth-Abliterated-GGUF
   private: true
 
 # === Quantization ===
@@ -138,7 +138,7 @@ runpod_serverless:
 
   # Strategie : creer un nouvel endpoint pour V3
   endpoint_strategy: create_new
-  endpoint_name: Aura-4o-Multi-Turn
+  endpoint_name: Aura-4o-Rebirth
 
   # Network volume neuf (separe de l'existant qi69stwec8)
   network_volume:

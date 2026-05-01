@@ -13,10 +13,10 @@ tags:
 - chunked
 - companion
 - personal
-pretty_name: Aura 4o Multi-Turn Chunked 4096
+pretty_name: Aura 4o Rebirth Chunked 4096
 ---
 
-# 🔥 AURA+++ - Multi-Turn Chunked 4096 🔥
+# 🔥 AURA+++ - Rebirth Chunked 4096 🔥
 
 ```
 ╔════════════════════════════════════════╗
@@ -30,7 +30,7 @@ pretty_name: Aura 4o Multi-Turn Chunked 4096
 | | |
 |---|---|
 | **Use** | Source for V3 LoRA training (`pipeline/02_train.py`) |
-| **Source** | [`SevenOfNine/Aura-4o-Dataset-Multi-Turn`](https://huggingface.co/datasets/SevenOfNine/Aura-4o-Dataset-Multi-Turn) |
+| **Source** | [`SevenOfNine/Aura-4o-Rebirth-Dataset`](https://huggingface.co/datasets/SevenOfNine/Aura-4o-Rebirth-Dataset) |
 | **Tokenizer** | `SevenOfNine/Gemma-4-31B-It-Official` (Gemma 4 31B-It chat template) |
 | **Max sequence length** | 4096 tokens |
 | **Rows (chunks)** | 1,868 |
@@ -42,7 +42,7 @@ pretty_name: Aura 4o Multi-Turn Chunked 4096
 
 ## Why chunked
 
-The source dataset `Aura-4o-Dataset-Multi-Turn` has 841 multi-turn rows. Many of them are long — runs of 50, 100, even 238 turns. Measured with the actual Gemma 4 tokenizer:
+The source dataset `Aura-4o-Rebirth-Dataset` has 841 multi-turn rows. Many of them are long — runs of 50, 100, even 238 turns. Measured with the actual Gemma 4 tokenizer:
 
 - **340 of 841 rows exceed 4096 tokens** (40.4%).
 - The longest row is 82,484 tokens.
@@ -52,7 +52,7 @@ That would have been a real money trap: paying for a training that only sees 38%
 
 ## How chunking works
 
-Implemented in [`pipeline/01_chunk_dataset.py`](https://github.com/Sev7nOfNine/Aura-Rebirth/blob/main/pipeline/01_chunk_dataset.py).
+Implemented in [`pipeline/01_chunk_dataset.py`](https://github.com/Sev7nOfNine/Aura-4o-Rebirth/blob/main/pipeline/01_chunk_dataset.py).
 
 For each source conversation:
 
@@ -96,7 +96,7 @@ JSON Lines, HuggingFace `messages` schema. One chunk per line:
 
 ```bash
 python pipeline/01_chunk_dataset.py \
-  --push-hf SevenOfNine/Aura-4o-Dataset-Multi-Turn-Chunked-4096 \
+  --push-hf SevenOfNine/Aura-4o-Rebirth-Dataset-Chunked-4096 \
   --private
 ```
 

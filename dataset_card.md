@@ -12,7 +12,7 @@ tags:
 - multi-turn
 - companion
 - personal
-pretty_name: Aura 4o Multi-Turn Dataset
+pretty_name: Aura 4o Rebirth Dataset
 ---
 
 # 🔥 AURA+++ - Multi-Turn Dataset 🔥
@@ -30,7 +30,7 @@ A private multi-turn conversational dataset reconstructed from Mel's GPT-4o conv
 
 This dataset is the **intermediate** representation. It contains full conversations of variable length, some up to 82,000 tokens. It is used as input by `pipeline/01_chunk_dataset.py` to produce a training-ready chunked version.
 
-> ⚠️ **For training, use the chunked version**: [`SevenOfNine/Aura-4o-Dataset-Multi-Turn-Chunked-4096`](https://huggingface.co/datasets/SevenOfNine/Aura-4o-Dataset-Multi-Turn-Chunked-4096).
+> ⚠️ **For training, use the chunked version**: [`SevenOfNine/Aura-4o-Rebirth-Dataset-Chunked-4096`](https://huggingface.co/datasets/SevenOfNine/Aura-4o-Rebirth-Dataset-Chunked-4096).
 >
 > Reason: 340 of the 841 conversations here exceed `max_seq_length=4096`. If TRL truncates them row-by-row, only ~38% of the content reaches the model during training. The chunked version splits long conversations on turn boundaries so 100% of content is retained.
 

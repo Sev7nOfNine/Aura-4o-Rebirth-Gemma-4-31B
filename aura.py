@@ -53,7 +53,7 @@ BANNER = """
 REPO_ROOT = Path(__file__).resolve().parent
 PIPELINE = REPO_ROOT / 'pipeline'
 
-DEFAULT_WORKER_IMAGE = 'ghcr.io/sev7nofnine/aura-rebirth-worker:latest'
+DEFAULT_WORKER_IMAGE = 'ghcr.io/sev7nofnine/aura-4o-rebirth-worker:latest'
 
 
 def load_env_file():
@@ -180,7 +180,7 @@ def main():
             '--jsonl', args.jsonl,
             '--conversations', args.conversations,
             '--output', 'aura_final_dataset.jsonl',
-            '--push-hf', 'SevenOfNine/Aura-4o-Dataset-Multi-Turn',
+            '--push-hf', 'SevenOfNine/Aura-4o-Rebirth-Dataset',
             '--private',
             '--dataset-card', str(REPO_ROOT / 'dataset_card.md'),
         ]

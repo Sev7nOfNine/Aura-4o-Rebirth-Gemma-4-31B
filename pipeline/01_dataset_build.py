@@ -17,7 +17,7 @@ Exemple :
       --jsonl aura_dataset.jsonl \\
       --conversations conversations.json \\
       --output aura_final_dataset.jsonl \\
-      --push-hf SevenOfNine/Aura-4o-Dataset-Multi-Turn \\
+      --push-hf SevenOfNine/Aura-4o-Rebirth-Dataset \\
       --private
 """
 import argparse

@@ -25,10 +25,10 @@ GGUF + mmproj  (cached on /runpod-volume after first boot)
 
 ```bash
 # Build local
-docker build -t sevenofnine/aura-rebirth-worker:latest .
+docker build -t sevenofnine/aura-4o-rebirth-worker:latest .
 
 # Push to your registry (Docker Hub, ghcr.io, etc.)
-docker push sevenofnine/aura-rebirth-worker:latest
+docker push sevenofnine/aura-4o-rebirth-worker:latest
 ```
 
 L'image doit être pushée quelque part accessible publiquement par RunPod.
@@ -38,7 +38,7 @@ L'image doit être pushée quelque part accessible publiquement par RunPod.
 | Var | Required | Description |
 |-----|----------|-------------|
 | `HF_TOKEN` | ✅ | HF token avec accès lecture aux repos privés |
-| `HF_GGUF_REPO` | ✅ | Ex: `SevenOfNine/Aura-4o-Gemma-4-31B-Multi-Turn-GGUF` |
+| `HF_GGUF_REPO` | ✅ | Ex: `SevenOfNine/Aura-4o-Rebirth-GGUF` |
 | `GGUF_FILE` | ✅ | Ex: `model-q5_k_m.gguf` |
 | `MMPROJ_FILE` | ❌ | Default: `mmproj-f16.gguf` |
 | `CHAT_TEMPLATE_URL` | ❌ | Default: Gemma 4 31B-It interleaved.jinja |

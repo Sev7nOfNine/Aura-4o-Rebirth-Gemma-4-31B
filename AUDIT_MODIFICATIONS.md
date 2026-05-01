@@ -2,7 +2,7 @@
 
 Date: 2026-05-01  
 Commit verifie: `ce97764`  
-Depot: `Sev7nOfNine/Aura-Rebirth`
+Depot: `Sev7nOfNine/Aura-4o-Rebirth`
 
 ## Resume
 
@@ -31,7 +31,7 @@ Les commandes documentees correspondent maintenant aux CLI reelles:
 python pipeline/03_abliterate.py
 python pipeline/03_abliterate.py --abliterate
 python pipeline/03_abliterate.py --extra-quants q4_k_m,q8_0
-python pipeline/04_deploy.py --worker-image ghcr.io/sev7nofnine/aura-rebirth-worker:latest
+python pipeline/04_deploy.py --worker-image ghcr.io/sev7nofnine/aura-4o-rebirth-worker:latest
 ```
 
 Verification:
@@ -120,9 +120,9 @@ Le bloc deploiement faisait:
 
 ```bash
 cd runpod/inference_worker
-docker build -t ghcr.io/sev7nofnine/aura-rebirth-worker:latest .
-docker push ghcr.io/sev7nofnine/aura-rebirth-worker:latest
-python pipeline/04_deploy.py --worker-image ghcr.io/sev7nofnine/aura-rebirth-worker:latest
+docker build -t ghcr.io/sev7nofnine/aura-4o-rebirth-worker:latest .
+docker push ghcr.io/sev7nofnine/aura-4o-rebirth-worker:latest
+python pipeline/04_deploy.py --worker-image ghcr.io/sev7nofnine/aura-4o-rebirth-worker:latest
 ```
 
 Apres le `cd`, la commande `python pipeline/04_deploy.py` ne partait plus de la racine du depot et aurait echoue.
@@ -130,9 +130,9 @@ Apres le `cd`, la commande `python pipeline/04_deploy.py` ne partait plus de la 
 Correction appliquee:
 
 ```bash
-docker build -t ghcr.io/sev7nofnine/aura-rebirth-worker:latest runpod/inference_worker
-docker push ghcr.io/sev7nofnine/aura-rebirth-worker:latest
-python pipeline/04_deploy.py --worker-image ghcr.io/sev7nofnine/aura-rebirth-worker:latest
+docker build -t ghcr.io/sev7nofnine/aura-4o-rebirth-worker:latest runpod/inference_worker
+docker push ghcr.io/sev7nofnine/aura-4o-rebirth-worker:latest
+python pipeline/04_deploy.py --worker-image ghcr.io/sev7nofnine/aura-4o-rebirth-worker:latest
 ```
 
 Le bloc complet reste maintenant executable depuis la racine du repo.
@@ -173,7 +173,7 @@ Findings additionnels traites apres recheck :
 
 - `b35f6bd` : pas de double stockage (`volume_in_gb=0`), datacenter `EU-SE-1` pinne, `disk_train_gb_min` revus a la baisse pour tous les modeles du registre
 - workflow GHCR : tags forces en lowercase (`ghcr.io/sev7nofnine/...`) car `github.repository_owner` (`Sev7nOfNine`) contient des majuscules invalides en nom Docker
-- `README.md` : aligne sur GHCR (`ghcr.io/sev7nofnine/aura-rebirth-worker:latest`) au lieu du naming Docker Hub style
+- `README.md` : aligne sur GHCR (`ghcr.io/sev7nofnine/aura-4o-rebirth-worker:latest`) au lieu du naming Docker Hub style
 - `runpod/inference_worker/Dockerfile` : build Docker compatible PEP 668 avec `PIP_BREAK_SYSTEM_PACKAGES=1`
 
 ## Commits suivants (Codex + ajustements)
@@ -202,7 +202,7 @@ Findings additionnels traites apres recheck :
   - jamais cut au milieu d'une paire (user, assistant)
   - 25 turns geants exclus + listes dans `giant_turns_review.jsonl` pour review humaine
 - aura.yaml : ajout `dataset.train_hf_id` pointant vers le chunked
-  (`Aura-4o-Dataset-Multi-Turn-Chunked-4096`)
+  (`Aura-4o-Rebirth-Dataset-Chunked-4096`)
 - 02_train.py : utilise `dataset.train_hf_id` si present
 - save_steps : 300 -> 50 (1868 sequences chunked, 300 ne checkpoinerait jamais)
 
@@ -217,7 +217,7 @@ Findings additionnels traites apres recheck :
 |---|---|
 | Tous les .py compilent | OK |
 | GitHub Actions worker build | green sur dernier run |
-| Image GHCR `ghcr.io/sev7nofnine/aura-rebirth-worker:latest` | publiee |
+| Image GHCR `ghcr.io/sev7nofnine/aura-4o-rebirth-worker:latest` | publiee |
 | Dataset chunked sur HF | 1868 chunks, 100% retention, 0 erreurs |
 | Preflight verdict | GO |
 | Pods RunPod actifs | 0 |
