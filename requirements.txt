@@ -11,6 +11,7 @@ transformers>=4.45.0
 # RunPod orchestration
 runpod>=1.7.0
 paramiko>=3.4.0
+requests>=2.32.0
 
 # Utils
 pyyaml>=6.0

@@ -28,6 +28,8 @@ Usage typique :
 
 Au moindre echec dans une etape, le script s'arrete avec un message clair.
 Tu peux reprendre en sautant les etapes deja faites avec --skip-*.
+
+Un preflight read-only est lance avant toute etape couteuse, sauf --skip-preflight.
 """
 import argparse
 import io
@@ -117,6 +119,8 @@ def main():
                         help=f'Docker image for serverless worker (default: {DEFAULT_WORKER_IMAGE})')
     parser.add_argument('--skip-confirm', action='store_true',
                         help='Skip individual confirmation prompts in each step.')
+    parser.add_argument('--skip-preflight', action='store_true',
+                        help='Skip read-only preflight checks. Use only if you already reviewed the report.')
     args = parser.parse_args()
 
     # === Sanity check env ===
@@ -161,6 +165,10 @@ def main():
     py = sys.executable
     cfg_arg = ['--config', args.config]
     skip_confirm_arg = ['--skip-confirm'] if args.skip_confirm else []
+
+    if not args.skip_preflight:
+        cmd = [py, str(REPO_ROOT / 'preflight.py'), '--config', args.config]
+        run_step('Preflight : read-only GO/NO-GO', cmd)
 
     # === Step 1 (optional) : rebuild dataset ===
     if args.rebuild_dataset:

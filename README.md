@@ -31,7 +31,19 @@ python aura.py --skip-train --skip-gguf
 python aura.py --skip-train --abliterate
 ```
 
-`aura.py` orchestre les 4 sous-scripts ci-dessous. À la moindre erreur dans une étape il s'arrête avec un message clair, et tu peux reprendre en sautant les étapes déjà faites.
+`aura.py` orchestre les 4 sous-scripts ci-dessous. Il lance d'abord `preflight.py` en read-only pour sortir un verdict `GO/NO-GO` avant toute dépense RunPod. À la moindre erreur dans une étape il s'arrête avec un message clair, et tu peux reprendre en sautant les étapes déjà faites.
+
+## Garde-fous avant dépense
+
+```bash
+# Audit read-only : dataset, longueurs tokenizer, coûts, CI worker, RunPod si clé dispo
+python preflight.py
+
+# Après déploiement : teste le vrai endpoint façon TypingMind
+python typingmind_smoke.py --endpoint-id <RUNPOD_ENDPOINT_ID>
+```
+
+`preflight.py` bloque notamment si trop de conversations dépassent `training.max_seq_length`, car TRL peut tronquer les exemples longs. `typingmind_smoke.py` envoie de vraies requêtes à l'endpoint et vérifie texte, thinking-off, vision, tools/function-calling et forme web-search.
 
 ## Sous-scripts (utilisables séparément aussi)
 
