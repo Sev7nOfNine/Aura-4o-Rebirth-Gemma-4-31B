@@ -176,21 +176,42 @@ Le worker tourne en `--reasoning-format deepseek` (capacité présente, pas forc
 
 ```
 Aura-Rebirth/
-├── README.md
-├── requirements.txt
+├── README.md                              # ce fichier
+├── LICENSE                                # MIT
+├── AUDIT_MODIFICATIONS.md                 # historique des audits Codex et fixes appliqués
+├── requirements.txt                       # deps Python
+├── .env.template                          # template tokens (HF + RunPod)
+├── .gitignore
+│
+├── aura.py                                # ⚡ orchestrateur tout-en-un (preflight + train + GGUF + deploy)
+├── preflight.py                           # audit read-only avant dépense RunPod (verdict GO/NO-GO)
+├── typingmind_smoke.py                    # tests post-deploy : text + thinking-off + vision + tools + web
+│
 ├── pipeline/
-│   ├── 01_dataset_build.py
-│   ├── 02_train.py
-│   ├── 03_abliterate.py
-│   └── 04_deploy.py
+│   ├── 01_dataset_build.py                # paires JSONL + conversations.json → dataset multi-turn
+│   ├── 01_chunk_dataset.py                # chunk dataset multi-turn → trainable 4096 tokens
+│   ├── 02_train.py                        # LoRA SFT sur RunPod, V1 strict recipe + Unsloth 4-bit merge
+│   ├── 03_abliterate.py                   # pull merged → mmproj + GGUF + push HF (ablit optionnelle)
+│   └── 04_deploy.py                       # nouvel endpoint serverless RunPod (protège l'existant)
+│
 ├── configs/
-│   └── aura.yaml
+│   └── aura.yaml                          # SOURCE DE VÉRITÉ : modèles, GPU pool, hyperparams, RunPod
+│
 ├── docs/
-│   ├── METHODOLOGY.md
-│   └── DATASET.md
-└── runpod/
-    ├── train_worker/
-    └── inference_worker/
+│   ├── DATASET.md                         # construction du dataset multi-turn (méthodologie)
+│   └── METHODOLOGY.md                     # pourquoi multi-turn + LoRA léger + Unsloth 4-bit merge
+│
+├── dataset_card.md                        # README HF du dataset Multi-Turn (intermédiaire)
+├── dataset_card_chunked.md                # README HF du dataset Chunked-4096 (utilisé pour training)
+│
+├── runpod/inference_worker/
+│   ├── Dockerfile                         # image worker llama.cpp:server-cuda + handler.py
+│   ├── start-runpod.sh                    # boot : chat template + GGUF + mmproj + llama-server
+│   ├── handler.py                         # handler RunPod Serverless (Option E thinking fallback)
+│   └── README.md                          # config worker + env vars
+│
+└── .github/workflows/
+    └── build-worker.yml                   # CI : build + push image GHCR à chaque push
 ```
 
 ---

@@ -176,6 +176,54 @@ Findings additionnels traites apres recheck :
 - `README.md` : aligne sur GHCR (`ghcr.io/sev7nofnine/aura-rebirth-worker:latest`) au lieu du naming Docker Hub style
 - `runpod/inference_worker/Dockerfile` : build Docker compatible PEP 668 avec `PIP_BREAK_SYSTEM_PACKAGES=1`
 
+## Commits suivants (Codex + ajustements)
+
+`9ffa5a8` (script tout-en-un + checkpoints)
+- `aura.py` ajoute a la racine : orchestrateur train + GGUF + deploy en une commande
+- 02_train.py : checkpoints LoRA pousses sur HF tous les save_steps
+  (`save_strategy=steps`, `push_to_hub=True`, `hub_strategy=every_save`)
+- aura.yaml : `save_steps=300` initialement, abaisse a `50` plus tard apres chunking
+
+`2da2727` (preflight + smoke tests)
+- `preflight.py` : audit read-only avant depense RunPod
+  - structure dataset (JSON, roles, vides, thinking, dashes)
+  - tokenization vraie via tokenizer Gemma 4
+  - check `max_seq_length` : avait detecte le piege 340/841 rows > 4096
+  - GitHub Actions worker image status
+  - inventaire RunPod actif (pods + endpoints)
+  - sortie : `preflight_report.md` avec verdict GO / NO-GO
+- `typingmind_smoke.py` : 5 tests post-deploy
+  text, thinking-off, vision (image PNG), tools (function calling), web-tool shape
+- `aura.py` : lance `preflight.py` automatiquement avant chaque etape couteuse
+
+`4b7dfc5` (chunking)
+- `pipeline/01_chunk_dataset.py` : decoupe dataset multi-turn en chunks <= max_seq_length
+  - tokenizer Gemma 4 utilise pour mesure exacte
+  - jamais cut au milieu d'une paire (user, assistant)
+  - 25 turns geants exclus + listes dans `giant_turns_review.jsonl` pour review humaine
+- aura.yaml : ajout `dataset.train_hf_id` pointant vers le chunked
+  (`Aura-4o-Dataset-Multi-Turn-Chunked-4096`)
+- 02_train.py : utilise `dataset.train_hf_id` si present
+- save_steps : 300 -> 50 (1868 sequences chunked, 300 ne checkpoinerait jamais)
+
+`2153a3b` (dataset cards)
+- `dataset_card_chunked.md` : nouveau, README pour le dataset HF chunked
+- `dataset_card.md` : warning ajoute en haut, pointer vers le chunked, stats reelles
+- Push sur HF : les deux datasets ont maintenant un README clair
+
+## Etat final pipeline
+
+| Verification | Statut |
+|---|---|
+| Tous les .py compilent | OK |
+| GitHub Actions worker build | green sur dernier run |
+| Image GHCR `ghcr.io/sev7nofnine/aura-rebirth-worker:latest` | publiee |
+| Dataset chunked sur HF | 1868 chunks, 100% retention, 0 erreurs |
+| Preflight verdict | GO |
+| Pods RunPod actifs | 0 |
+| Endpoint V1 existant `01p64ykg6u3p0i` | dormant, intact |
+| Cout estime training V3 | $4.68 - $9.36 (12-24h sur A40 EU-SE-1) |
+
 ## Prochaines Etapes Recommandees
 
 1. Verifier que le workflow `Build & Push Worker Image` repasse au vert.
