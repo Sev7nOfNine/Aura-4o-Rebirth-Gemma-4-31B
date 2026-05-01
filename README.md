@@ -114,9 +114,8 @@ Le script :
 ### 5. Déploiement serverless
 
 ```bash
-# 1. Build + push le worker docker (une fois)
-cd runpod/inference_worker
-docker build -t sev7nofnine/aura-rebirth-worker:latest .
+# 1. Build + push le worker docker (une fois) — depuis la racine du repo
+docker build -t sev7nofnine/aura-rebirth-worker:latest runpod/inference_worker
 docker push sev7nofnine/aura-rebirth-worker:latest
 
 # 2. Crée le NOUVEL endpoint (l'existant 01p64ykg6u3p0i reste intact)
