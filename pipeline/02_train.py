@@ -471,18 +471,32 @@ def main():
     # === Prepare autonomous bootstrap ===
     print()
     print('[3/6] Preparing autonomous training bootstrap...')
+    # IMPORTANT : TMPDIR + --no-cache-dir + installs atomiques pour eviter
+    # l'OOM cgroup-kill du pod RunPod pendant pip install d'Unsloth.
+    # /tmp est tmpfs RAM-backed sur ces images, et le peak combine torch 2.10
+    # + nvidia-cudnn/cublas/cusparse/nccl (~5-7 GB de wheels) faisait sauter
+    # la RAM container (16 GB) → SIGKILL silencieux, pas de trap, pod disparait.
+    # Voir docs/TROUBLESHOOTING.md incident #5.
     install_cmds = [
+        'mkdir -p /workspace/tmp',
         'apt-get update && apt-get install -y git build-essential cmake',
-        'pip install --upgrade pip',
-        'pip install unsloth',
-        'pip install "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git" --force-reinstall --no-deps',
-        'pip install --upgrade unsloth_zoo --no-deps',
-        'pip install xformers trl peft accelerate bitsandbytes datasets huggingface_hub hf_transfer',
-        # Pin transformers a une version compatible avec unsloth-zoo
-        # (unsloth-zoo 2026.4.x requiert transformers >=4.51.3, <=5.5.0,
-        #  avec exclusions). `pip install --upgrade transformers` poussait
-        #  vers 5.7.0 et cassait `from unsloth import FastModel`.
-        'pip install "transformers>=4.56.0,<=5.5.0,!=4.57.4,!=4.57.5,!=5.0.0,!=5.1.0"',
+        'export TMPDIR=/workspace/tmp PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1 && pip install --upgrade pip',
+        'export TMPDIR=/workspace/tmp PIP_NO_CACHE_DIR=1 && pip install --no-cache-dir unsloth',
+        'export TMPDIR=/workspace/tmp PIP_NO_CACHE_DIR=1 && pip install --no-cache-dir "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git" --force-reinstall --no-deps',
+        'export TMPDIR=/workspace/tmp PIP_NO_CACHE_DIR=1 && pip install --no-cache-dir --upgrade unsloth_zoo --no-deps',
+        # Splittes : un paquet a la fois, jamais plusieurs wheels en parallele
+        'export TMPDIR=/workspace/tmp PIP_NO_CACHE_DIR=1 && pip install --no-cache-dir xformers',
+        'export TMPDIR=/workspace/tmp PIP_NO_CACHE_DIR=1 && pip install --no-cache-dir trl',
+        'export TMPDIR=/workspace/tmp PIP_NO_CACHE_DIR=1 && pip install --no-cache-dir peft',
+        'export TMPDIR=/workspace/tmp PIP_NO_CACHE_DIR=1 && pip install --no-cache-dir accelerate',
+        'export TMPDIR=/workspace/tmp PIP_NO_CACHE_DIR=1 && pip install --no-cache-dir bitsandbytes',
+        'export TMPDIR=/workspace/tmp PIP_NO_CACHE_DIR=1 && pip install --no-cache-dir datasets',
+        'export TMPDIR=/workspace/tmp PIP_NO_CACHE_DIR=1 && pip install --no-cache-dir huggingface_hub',
+        'export TMPDIR=/workspace/tmp PIP_NO_CACHE_DIR=1 && pip install --no-cache-dir hf_transfer',
+        # Pin transformers compatible unsloth-zoo (incident #4)
+        'export TMPDIR=/workspace/tmp PIP_NO_CACHE_DIR=1 && pip install --no-cache-dir "transformers>=4.56.0,<=5.5.0,!=4.57.4,!=4.57.5,!=5.0.0,!=5.1.0"',
+        # Diagnostic : afficher disk + RAM apres tous les installs (utile si on rate encore)
+        'echo "=== POST-INSTALL RESOURCES ===" && df -h /workspace /tmp && echo --- && free -h',
     ]
     train_script = generate_training_script(
         cfg,

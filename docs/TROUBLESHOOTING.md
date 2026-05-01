@@ -136,6 +136,80 @@ Copier le pattern de bash bootstrap auto-delete utilise dans
 
 ---
 
+## 5. Pod tue silencieusement par OOM cgroup pendant `pip install`
+
+### Symptome
+
+Pods 3 et 4 sont morts a peu pres au meme endroit (~10-15 min apres
+boot, soit pendant les pip install d'Unsloth, soit juste apres).
+Caracteristiques :
+
+- **Aucune trace dans le log** local (le `tail -f /workspace/aura_run.log`
+  via SSH polling s'arrete net en plein milieu d'un download pip).
+- **Aucun Traceback Python**.
+- **Aucun message du bash trap** (`[cleanup] RunPod delete requested...`).
+- Pod simplement disparu cote console RunPod : "Pod data is no longer
+  available. It may have been terminated."
+- **Reproductible sur 2 datacenters differents** (EU-SE-1 et CA-MTL-1) →
+  donc pas un probleme d'infra RunPod.
+- A peu pres meme timing à chaque essai → cause deterministe cote nous.
+
+### Cause racine
+
+Le pip install d'Unsloth telecharge en parallele :
+- torch 2.10 (~915 MB)
+- nvidia-cudnn (~700 MB)
+- nvidia-cublas (~594 MB)
+- nvidia-cusparse/cusolver/cufft (~600 MB)
+- nccl (~322 MB)
+- nvshmem, cusparselt, etc.
+
+Total : **~5-7 GB de wheels en flight**.
+
+Sur les containers RunPod, **`/tmp` est tmpfs RAM-backed**. Pip telecharge
+et extrait dans /tmp avant install, donc tout ce volume passe par la RAM.
+Combine a la RAM deja prise par le base image PyTorch + apt cache + pip
+internes, le peak depasse la limite RAM du container (16 GB sur l'image
+`runpod/pytorch:2.8.0`).
+
+Quand cgroup hit la limite : **SIGKILL instantane** sur tout le container.
+Le bash trap `finish` n'a pas le temps de tourner (SIGKILL ne laisse pas
+de chance), donc :
+- `delete_pod` n'est pas appele
+- Pas de log de cleanup
+- Pod tombe juste mort, et RunPod le marque comme terminated tout seul
+
+### Fix
+
+Trois modifications combinees dans `pipeline/02_train.py` `install_cmds` :
+
+1. **`export TMPDIR=/workspace/tmp`** sur chaque install → pip utilise
+   le disk persistent au lieu de tmpfs RAM.
+2. **`PIP_NO_CACHE_DIR=1` + `--no-cache-dir`** → pip ne garde aucun
+   wheel en cache, telecharge-extract-supprime.
+3. **Splitter les installs un par un** plutot que `pip install A B C D E F G H`
+   tout ensemble → jamais plusieurs wheels en parallele.
+
+Plus une commande diagnostic en fin (`df -h` + `free -h`) pour qu'on voie
+les ressources si on plante encore.
+
+### Fichiers touches
+
+- `pipeline/02_train.py` (variable `install_cmds`)
+- A appliquer aussi dans `scripts/hf_jobs/train_aura_rebirth.py` si on
+  bascule sur HF Jobs un jour, mais le `uv run` de HF Jobs n'a pas ce
+  probleme (uv extract de maniere streaming, pas de peak RAM tmpfs).
+
+### Date
+
+2026-05-01.
+
+### Cout incident (cumule essais 3 + 4)
+
+~$0,30 (deux pods morts apres ~15 min chacun sur A40 secure).
+
+---
+
 ## 4. `pip install --upgrade transformers` casse l'import unsloth
 
 ### Symptome

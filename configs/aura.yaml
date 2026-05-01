@@ -123,7 +123,7 @@ runpod_train:
   ssh_port: 22
   vram_safety_factor: 1.15  # +15% marge VRAM
   disk_safety_factor: 1.30  # +30% marge disque
-  preferred_datacenter: EU-SE-1  # Suede, proche Belgique pour Mel
+  preferred_datacenter: EU-SE-1  # Suede, proche Belgique pour Mel (les crashs etaient un OOM cgroup pas un probleme de DC, voir docs/TROUBLESHOOTING.md #5)
   # GPU + disk auto-selectionnes selon model.params (voir 'models' + 'gpu_pool')
 
 # === RunPod (inférence serverless) ===
