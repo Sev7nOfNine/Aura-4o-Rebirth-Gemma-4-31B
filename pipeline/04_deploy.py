@@ -150,14 +150,17 @@ def main():
         'DEFAULT_REPETITION_PENALTY': str(sl['inference']['repetition_penalty']),
         'DEFAULT_MAX_TOKENS': str(sl['inference']['max_tokens']),
     }
+    # Per RunPod OpenAPI spec :
+    #   env is an OBJECT (dict key->value), not an array of {key, value}
+    #   dockerStartCmd is an ARRAY (or omitted if entrypoint suffices)
     template_payload = {
         'name': f'{sl["endpoint_name"]}-template',
         'imageName': args.worker_image,
         'isServerless': True,
         'containerDiskInGb': 5,  # small, big stuff goes on network volume
         'volumeMountPath': '/runpod-volume',
-        'env': [{'key': k, 'value': v} for k, v in env_vars.items()],
-        'dockerStartCmd': '',  # entrypoint is set in Dockerfile
+        'env': env_vars,  # object/dict, NOT [{key, value}]
+        # dockerStartCmd omis : ENTRYPOINT du Dockerfile prend le relai
     }
     r = requests.post('https://rest.runpod.io/v1/templates', headers=H, json=template_payload)
     if not r.ok:
@@ -170,16 +173,21 @@ def main():
     # === Step 3 : Create endpoint ===
     print()
     print('[3/4] Creating serverless endpoint...')
+    # Per RunPod OpenAPI spec :
+    #   dataCenterIds (array), pas 'locations'
+    #   networkVolumeId (string singulier)
+    #   workersStandby N'EXISTE PAS dans la spec endpoint creation
+    #   scalerValue est en SECONDES si scalerType=QUEUE_DELAY
     endpoint_payload = {
         'name': sl['endpoint_name'],
         'templateId': template_id,
         'networkVolumeId': volume_id,
-        'locations': sl['network_volume']['datacenter'],
+        'dataCenterIds': [sl['network_volume']['datacenter']],
         'gpuTypeIds': sl['gpu_preference'],
         'gpuCount': 1,
+        'computeType': 'GPU',
         'workersMin': sl['scale']['workers_min'],
         'workersMax': sl['scale']['workers_max'],
-        'workersStandby': sl['scale']['workers_standby'],
         'idleTimeout': sl['scale']['idle_timeout_sec'],
         'flashboot': True,
         'scalerType': 'QUEUE_DELAY',

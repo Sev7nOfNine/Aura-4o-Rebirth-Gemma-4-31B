@@ -359,26 +359,6 @@ def main():
     jsonl_pairs = load_jsonl(args.jsonl)
     print(f'  {len(jsonl_pairs)} pairs')
 
-    strip_thinking = not args.no_strip_thinking
-    strip_dashes = not args.no_strip_dashes
-    if strip_thinking or strip_dashes:
-        print(f'\nCleanup : thinking={strip_thinking} em_dashes={strip_dashes}')
-        thinking_count = 0
-        dash_count = 0
-        cleaned = []
-        for p in jsonl_pairs:
-            new_p = cleanup_pair(p, strip_thinking=strip_thinking, strip_dashes=strip_dashes)
-            if strip_thinking and new_p['output'] != p['output'] and any(t in p['output'] for t in ['<thinking', '<antThinking', '<think>', '<|channel', '<|thinking', '<reasoning', '<|begin_of_thought']):
-                thinking_count += 1
-            if strip_dashes and (p['output'] != new_p['output'] or p['instruction'] != new_p['instruction']) and any(d in p['output'] + p['instruction'] for d, _ in DASH_PATTERNS):
-                dash_count += 1
-            cleaned.append(new_p)
-        jsonl_pairs = cleaned
-        if strip_thinking:
-            print(f'  Thinking blocks stripped from {thinking_count} pairs')
-        if strip_dashes:
-            print(f'  Em-dashes replaced in {dash_count} pairs')
-
     print(f'\nLoading conversations : {args.conversations}')
     with open(args.conversations, 'r', encoding='utf-8') as f:
         conversations = json.load(f)
@@ -388,11 +368,44 @@ def main():
     all_export_pairs = extract_export_pairs(conversations)
     print(f'  {len(all_export_pairs)} pairs across all branches')
 
+    # IMPORTANT : matching utilise les paires JSONL RAW (avant cleanup)
+    # car l'export brut conversations.json contient encore em-dashes / thinking blocks.
+    # Nettoyer avant le match degraderait la couverture (Codex review).
     print('\nMatching jsonl <-> export...')
     ep_to_jsonl = match_jsonl_to_export(jsonl_pairs, all_export_pairs, args.fuzzy_threshold)
 
     print('\nBuilding runs...')
     runs, isolated = build_runs(all_export_pairs, ep_to_jsonl)
+
+    # Cleanup APRES matching, AVANT writing : on ne touche que les paires
+    # effectivement utilisees dans les runs ou isolated, le reste est ignore de toute facon.
+    strip_thinking = not args.no_strip_thinking
+    strip_dashes = not args.no_strip_dashes
+    if strip_thinking or strip_dashes:
+        print(f'\nCleanup (post-match) : thinking={strip_thinking} em_dashes={strip_dashes}')
+        used_indices = set()
+        for r in runs:
+            used_indices.update(r)
+        used_indices.update(isolated)
+        thinking_count = 0
+        dash_count = 0
+        for idx in used_indices:
+            p = jsonl_pairs[idx]
+            had_thinking = strip_thinking and any(
+                t in p['output']
+                for t in ['<thinking', '<antThinking', '<think>', '<|channel', '<|thinking', '<reasoning', '<|begin_of_thought']
+            )
+            had_dash = strip_dashes and any(d in (p['output'] + p['instruction']) for d, _ in DASH_PATTERNS)
+            new_p = cleanup_pair(p, strip_thinking=strip_thinking, strip_dashes=strip_dashes)
+            jsonl_pairs[idx] = new_p
+            if had_thinking and new_p['output'] != p['output']:
+                thinking_count += 1
+            if had_dash and (new_p['output'] != p['output'] or new_p['instruction'] != p['instruction']):
+                dash_count += 1
+        if strip_thinking:
+            print(f'  Thinking blocks stripped from {thinking_count} kept pairs')
+        if strip_dashes:
+            print(f'  Em-dashes replaced in {dash_count} kept pairs')
     print(f'  Multi-turn runs (>=2)  : {len(runs)}')
     print(f'  Isolated single-turn   : {len(isolated)}')
 
