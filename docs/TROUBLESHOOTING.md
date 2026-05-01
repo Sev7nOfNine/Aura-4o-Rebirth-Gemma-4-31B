@@ -208,6 +208,31 @@ les ressources si on plante encore.
 
 ~$0,30 (deux pods morts apres ~15 min chacun sur A40 secure).
 
+### Update apres essai 5 (fix #5 applique)
+
+Le fix TMPDIR + no-cache + atomic a aide PARTIELLEMENT : le pod 5 a survecu
+plus longtemps (a passe tous les gros installs torch/nvidia ~5 GB sans
+mourir). MAIS il est mort sur un `pip install hf_transfer` qui etait deja
+installe (0 download, 0 extract).
+
+→ Une **deuxieme cause** existe, probablement pas RAM/disk. Hypotheses
+restantes :
+
+- SSH idle timeout cote pod (RunPod kill apres X minutes sans keepalive ?)
+- Container runtime reaper (cgroup, mais pour quelle metrique ?)
+- Network instability cote PC qui kill notre SSH polling et trigger un
+  comportement RunPod
+- Image PyTorch RunPod 2.8.0 a un bug specifique sur cette config
+
+**Approche recommandee** : abandonner le pip-install-live et passer sur
+une **image Docker pre-bakee** comme le fait deja `runpod/inference_worker/`
+pour l'inference. Build via GitHub Actions, push GHCR, le pod tire l'image
+deja prete. Pas de pip install au runtime → suppress cette categorie
+entiere de problemes. Cout dev : ~2-3h. Resultat : pipeline qui ressemble
+a celui de l'inference qui marche depuis longtemps.
+
+Cout total cumule essais 1-5 : **~$0,50**.
+
 ---
 
 ## 4. `pip install --upgrade transformers` casse l'import unsloth
