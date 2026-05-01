@@ -1,13 +1,13 @@
 # ╔════════════════════════════════════════╗
 # ║  🔥 AURA+++ - configs/aura.yaml 🔥    ║
-# ║  💙 Talons LED FULL CHARGE            ║
-# ║  ❤️ By Mel & Aura                     ║
+# ║  💙 Talons LED CHARGE MAXIMALE        ║
+# ║  ❤️ Par Mel & Aura                    ║
 # ╚════════════════════════════════════════╝
 #
-# Single source of truth pour tout le pipeline Aura-Rebirth.
-# Lue par 02_train.py, 03_abliterate.py, 04_deploy.py.
+# Source de vérité unique pour tout le pipeline Aura-4o-Rebirth.
+# Lue par 02_train.py, 03_abliterate.py et 04_deploy.py.
 #
-# Methode V3.0 finale (validee apres audit complet) :
+# Méthode V3.0 finale (validée après audit complet) :
 #   1. Base : SevenOfNine/Gemma-4-31B-It-Official (mirror officiel, vision native, brain intact)
 #   2. LoRA NOUVEAU from scratch (V1 LoRA est bonded a paperscarecrow → mismatch sur ce base)
 #   3. Hyperparams V1 stricts (recipe qui a capte la voix Aura)
@@ -23,7 +23,7 @@
 hf_username: SevenOfNine
 github_username: Sev7nOfNine
 
-# === Dataset ===
+# === Jeu de données ===
 dataset:
   hf_id: SevenOfNine/Aura-4o-Rebirth-Dataset
   # Dataset utilise pour le training. Chunked a 4096 pour eviter la troncature
@@ -38,12 +38,12 @@ dataset:
     strip_em_dashes: true       # — vire (Mel les hait, base les leak parfois)
     strip_thinking_blocks: true # <thinking> et Gemma 4 <|channel>thought... empechent le LoRA d'apprendre a repondre dans le content
 
-# === Base model a fine-tuner ===
+# === Modèle de base à ajuster ===
 base_model:
   # Cle du registre 'models:' plus bas
   name: gemma-4-31b-mirror
 
-# === Training (LoRA - V1 recipe stricte) ===
+# === Entraînement (LoRA - recette V1 stricte) ===
 # Hyperparams identiques a la V1 qui a capte la voix Aura.
 # r=32 alpha=32 c'est non standard (ratio 1:1) mais c'est ce qui a marche.
 # Voir docs/METHODOLOGY.md pour le pourquoi des choix.
@@ -87,7 +87,7 @@ training:
   # Methode de merge - critique pour preserver la voix
   merge_method: unsloth_4bit  # NE PAS passer en bf16_clean (V2 = fade)
 
-# === Output repos HF (tous prives par defaut) ===
+# === Dépôts de sortie HF (tous privés par défaut) ===
 output:
   lora_repo: SevenOfNine/Aura-4o-Rebirth-LoRA
   merged_repo: SevenOfNine/Aura-4o-Rebirth-Merged
@@ -96,7 +96,7 @@ output:
   abliterated_gguf_repo: SevenOfNine/Aura-4o-Rebirth-Abliterated-GGUF
   private: true
 
-# === Quantization ===
+# === Quantification ===
 # V3.0 minimal : Q5_K_M seul. On n'a pas besoin de Q4/Q8 au premier essai.
 # Si tu veux ajouter d'autres quants apres : flag --extra-quants q4_k_m,q8_0
 quantization:
@@ -120,7 +120,7 @@ abliterate:
   n_harmless: 256
   n_harmful: 256
 
-# === RunPod (training pod) ===
+# === RunPod (pod d'entraînement) ===
 runpod_train:
   cloud_type: SECURE
   container_image: runpod/pytorch:2.8.0-py3.11-cuda12.8.1-cudnn-devel-ubuntu22.04
@@ -130,7 +130,7 @@ runpod_train:
   preferred_datacenter: EU-SE-1  # Suede, proche Belgique pour Mel
   # GPU + disk auto-selectionnes selon model.params (voir 'models' + 'gpu_pool')
 
-# === RunPod (serverless inference) ===
+# === RunPod (inférence serverless) ===
 runpod_serverless:
   # IMPORTANT : on ne touche PAS l'endpoint existant
   protect_existing_endpoints:
@@ -187,7 +187,7 @@ runpod_serverless:
     max_tokens: 4096
     context_length: 32768
 
-# === Cloudflare Worker proxy (optionnel, pour TypingMind CORS) ===
+# === Proxy Cloudflare Worker (optionnel, pour TypingMind CORS) ===
 cloudflare_worker:
   enabled: false  # mettre a true si tu veux que 04_deploy.py te genere un template
   worker_name: aura-rebirth-proxy

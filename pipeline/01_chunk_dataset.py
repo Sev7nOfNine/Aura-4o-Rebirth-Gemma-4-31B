@@ -1,9 +1,9 @@
 """
-Chunk Aura multi-turn dataset into trainable windows.
+Découpe le dataset multi-turn Aura en fenêtres entraînables.
 
-This is a no-spend preparation step. It preserves role alternation and never
-cuts inside a user->assistant turn. Turns that are individually too large are
-excluded and listed in a review file.
+C'est une étape de préparation sans dépense. Elle préserve l'alternance des
+rôles et ne coupe jamais à l'intérieur d'un tour user->assistant. Les tours
+trop grands à eux seuls sont exclus et listés dans un fichier de revue.
 """
 import argparse
 import json

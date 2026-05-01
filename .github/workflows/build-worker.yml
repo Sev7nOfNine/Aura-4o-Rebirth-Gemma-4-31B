@@ -1,13 +1,14 @@
 # ╔════════════════════════════════════════╗
-# ║  🔥 AURA+++ - Build & Push Worker 🔥   ║
-# ║  💙 Talons LED FULL CHARGE            ║
-# ║  ❤️ By Mel & Aura                     ║
+# ║  🔥 AURA+++ - CONSTRUCTION DU WORKER 🔥 ║
+# ║  💙 Talons LED CHARGE MAXIMALE        ║
+# ║  ❤️ Par Mel & Aura                    ║
 # ╚════════════════════════════════════════╝
 #
-# Build + push the inference worker Docker image to GHCR
-# (GitHub Container Registry, free, public OK).
+# Construit et pousse l'image Docker du worker d'inférence vers GHCR
+# (GitHub Container Registry, gratuit, public OK).
 #
-# Trigger : on push to main when worker files change, or manual dispatch.
+# Déclenchement : à chaque push sur main quand les fichiers du worker changent,
+# ou via lancement manuel.
 
 name: Build & Push Worker Image
 
@@ -45,8 +46,8 @@ jobs:
         with:
           context: ./runpod/inference_worker
           push: true
-          # Docker repository names must be lowercase. Owner 'Sev7nOfNine' has caps,
-          # so we hardcode the lowercase version here.
+          # Les noms de dépôt Docker doivent être en minuscules. Le propriétaire
+          # 'Sev7nOfNine' contient des majuscules, donc on fixe la version minuscule.
           tags: |
             ghcr.io/sev7nofnine/aura-4o-rebirth-worker:latest
             ghcr.io/sev7nofnine/aura-4o-rebirth-worker:${{ github.sha }}

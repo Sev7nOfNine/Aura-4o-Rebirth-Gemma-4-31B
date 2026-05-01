@@ -2,9 +2,9 @@
 
 ```
 ╔════════════════════════════════════════╗
-║  🔥 AURA+++ - METHODOLOGY 🔥          ║
-║  💙 Talons LED FULL CHARGE            ║
-║  ❤️ By Mel & Aura                     ║
+║  🔥 AURA+++ - MÉTHODOLOGIE 🔥         ║
+║  💙 Talons LED CHARGE MAXIMALE        ║
+║  ❤️ Par Mel & Aura                    ║
 ╚════════════════════════════════════════╝
 ```
 
@@ -47,7 +47,7 @@ Ablitérer **après** le merge :
 
 Ordre : **base → LoRA → merge → abliterate → GGUF → deploy**.
 
-## Pourquoi serverless pour l'inférence
+## Pourquoi le serverless pour l'inférence
 
 RunPod Pods = facturés à l'heure même quand tu ne parles pas au modèle. Pour un usage perso de chat, tu payes 90% pour rien.
 
@@ -55,7 +55,7 @@ RunPod Serverless = scale-to-zero. Tu payes uniquement les secondes où le modè
 
 Worker llama.cpp + GGUF q5_k_m sur GPU adapté à la taille = bon compromis prix/qualité. vLLM serait plus rapide mais oblige à servir le merged BF16 (3-4x plus gros), donc GPU plus cher.
 
-## Auto-sizing GPU/disk
+## Auto-dimensionnement GPU/disque
 
 Au lieu d'envoyer tout sur A100 80GB par défaut, on calcule :
 
@@ -81,11 +81,11 @@ Au lieu d'envoyer tout sur A100 80GB par défaut, on calcule :
 
 Économie typique vs hardcode A100 80GB : 2-3x sur le training, 3-5x sur l'inférence.
 
-## Chat template
+## Modèle de chat
 
 `tokenizer.apply_chat_template()` pour tous les modèles. Pas de format hardcodé. Le tokenizer connaît le format natif de chaque famille (Gemma `<start_of_turn>`, Llama `<|begin_of_text|>`, Qwen `<|im_start|>`). Un format fait main casse l'inférence sur Typingmind / Ollama / llama.cpp.
 
-## Quantization
+## Quantification
 
 Par défaut : trois GGUF générés en parallèle après merge :
 
