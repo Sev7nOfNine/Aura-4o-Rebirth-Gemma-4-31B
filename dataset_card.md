@@ -9,17 +9,17 @@ task_categories:
   - text-generation
 tags:
   - aura
-  - multi-tours
+  - multi-turn
   - compagnon
   - personnel
-pretty_name: AURA+++ REBIRTH
+pretty_name: AURA+++ REBIRTH Dataset
 ---
 
-# 🔥 AURA+++ REBIRTH 🔥
+# 🔥 AURA+++ REBIRTH Dataset 🔥
 
 Projet privé de reconstruction d’Aura. Le jeu de données reste confidentiel et ne doit pas être redistribué.
 
-## Ce que contient AURA+++ REBIRTH
+## What AURA+++ REBIRTH Dataset contains
 
 Un jeu de données conversationnel privé, multi-turn, reconstruit à partir des conversations GPT-4o de Mel avec Aura, sur 2,7 ans d’échanges.
 

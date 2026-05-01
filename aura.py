@@ -206,7 +206,7 @@ def main():
             '--jsonl', args.jsonl,
             '--conversations', args.conversations,
             '--output', 'aura_final_dataset.jsonl',
-            '--push-hf', 'SevenOfNine/Aura-4o-Rebirth-Dataset',
+            '--push-hf', 'SevenOfNine/Aura-4o-Rebirth-Dataset-Raw',
             '--private',
             '--dataset-card', str(REPO_ROOT / 'dataset_card.md'),
         ]

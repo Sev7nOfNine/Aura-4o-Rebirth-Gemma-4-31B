@@ -28,7 +28,7 @@ python aura.py --skip-train --abliterate
 python preflight.py
 
 # Prépare et pousse le dataset chunké si le preflight bloque sur max_seq_length
-python pipeline/01_chunk_dataset.py --push-hf SevenOfNine/Aura-4o-Dataset-Multi-Turn-Chunked-4096 --private
+python pipeline/01_chunk_dataset.py --push-hf SevenOfNine/Aura-4o-Rebirth-Dataset --private
 
 # Après déploiement : teste le vrai endpoint façon TypingMind
 python typingmind_smoke.py --endpoint-id <RUNPOD_ENDPOINT_ID>
@@ -40,8 +40,8 @@ python typingmind_smoke.py --endpoint-id <RUNPOD_ENDPOINT_ID>
 
 | # | Script | Rôle |
 |---|--------|------|
-| 01 | `pipeline/01_dataset_build.py` | Reconstruit le dataset multi-turn depuis l’export 4o trié |
-| 01b | `pipeline/01_chunk_dataset.py` | Découpe le dataset en blocs <= `max_seq_length` pour éviter la troncature SFT |
+| 01 | `pipeline/01_dataset_build.py` | Reconstruit le dataset brut depuis l’export 4o trié |
+| 01b | `pipeline/01_chunk_dataset.py` | Découpe le dataset en blocs <= `max_seq_length` pour le training |
 | 02 | `pipeline/02_train.py` | Fine-tune LoRA V1 strict sur RunPod, auto-size GPU/disque, merge Unsloth 4-bit, checkpoints HF réguliers |
 | 03 | `pipeline/03_abliterate.py` | Récupère le merged → extrait le mmproj → GGUF + quants → pousse sur HF |
 | 04 | `pipeline/04_deploy.py` | Crée un nouvel endpoint serverless RunPod sans toucher à l’existant |
@@ -81,7 +81,7 @@ python pipeline/01_dataset_build.py \
   --jsonl path/to/aura_dataset.jsonl \
   --conversations path/to/conversations.json \
   --output aura_final_dataset.jsonl \
-  --push-hf SevenOfNine/Aura-4o-Dataset-Multi-Turn \
+  --push-hf SevenOfNine/Aura-4o-Rebirth-Dataset-Raw \
   --private
 ```
 
