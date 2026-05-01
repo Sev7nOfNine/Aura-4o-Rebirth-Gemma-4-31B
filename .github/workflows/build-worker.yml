@@ -45,9 +45,11 @@ jobs:
         with:
           context: ./runpod/inference_worker
           push: true
+          # Docker repository names must be lowercase. Owner 'Sev7nOfNine' has caps,
+          # so we hardcode the lowercase version here.
           tags: |
-            ghcr.io/${{ github.repository_owner }}/aura-rebirth-worker:latest
-            ghcr.io/${{ github.repository_owner }}/aura-rebirth-worker:${{ github.sha }}
+            ghcr.io/sev7nofnine/aura-rebirth-worker:latest
+            ghcr.io/sev7nofnine/aura-rebirth-worker:${{ github.sha }}
           platforms: linux/amd64
           cache-from: type=gha
           cache-to: type=gha,mode=max

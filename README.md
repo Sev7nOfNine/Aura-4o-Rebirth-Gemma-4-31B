@@ -113,13 +113,21 @@ Le script :
 
 ### 5. Déploiement serverless
 
-```bash
-# 1. Build + push le worker docker (une fois) — depuis la racine du repo
-docker build -t sev7nofnine/aura-rebirth-worker:latest runpod/inference_worker
-docker push sev7nofnine/aura-rebirth-worker:latest
+L'image worker est buildée et publiée automatiquement par GitHub Actions sur GHCR à chaque push qui modifie `runpod/inference_worker/**`. Tu n'as rien à faire localement.
 
-# 2. Crée le NOUVEL endpoint (l'existant 01p64ykg6u3p0i reste intact)
-python pipeline/04_deploy.py --worker-image sev7nofnine/aura-rebirth-worker:latest
+```bash
+# Crée le NOUVEL endpoint (l'existant 01p64ykg6u3p0i reste intact)
+python pipeline/04_deploy.py --worker-image ghcr.io/sev7nofnine/aura-rebirth-worker:latest
+```
+
+Si tu veux forcer un rebuild manuel : `gh workflow run "Build & Push Worker Image"`.
+
+Si tu préfères builder localement (Docker requis) :
+
+```bash
+docker build -t ghcr.io/sev7nofnine/aura-rebirth-worker:latest runpod/inference_worker
+docker push ghcr.io/sev7nofnine/aura-rebirth-worker:latest
+python pipeline/04_deploy.py --worker-image ghcr.io/sev7nofnine/aura-rebirth-worker:latest
 ```
 
 Le script :

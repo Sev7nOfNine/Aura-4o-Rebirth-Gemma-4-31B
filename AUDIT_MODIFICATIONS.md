@@ -167,19 +167,13 @@ OK - les flags documentes correspondent aux scripts.
 ## Etat Actuel
 
 `ce97764` corrige les trois findings initiaux.  
-Le microfix README est present localement et doit encore etre commit/push si on veut le garder dans l'historique distant.
+Le microfix README et ce fichier d'audit ont ete integres dans `origin/main` via `abba47c`.
 
-Fichier modifie localement apres `ce97764`:
+Findings additionnels traites apres recheck :
 
-```text
-README.md
-```
-
-Nouveau fichier de suivi:
-
-```text
-AUDIT_MODIFICATIONS.md
-```
+- `b35f6bd` : pas de double stockage (`volume_in_gb=0`), datacenter `EU-SE-1` pinne, `disk_train_gb_min` revus a la baisse pour tous les modeles du registre
+- workflow GHCR : tags forces en lowercase (`ghcr.io/sev7nofnine/...`) car `github.repository_owner` (`Sev7nOfNine`) contient des majuscules invalides en nom Docker
+- `README.md` : aligne sur GHCR (`ghcr.io/sev7nofnine/aura-rebirth-worker:latest`) au lieu du naming Docker Hub style
 
 ## Prochaines Etapes Recommandees
 
