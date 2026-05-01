@@ -6,6 +6,18 @@
 #
 # Single source of truth pour tout le pipeline Aura-Rebirth.
 # Lue par 02_train.py, 03_abliterate.py, 04_deploy.py.
+#
+# Methode V3.0 finale (validee apres audit complet) :
+#   1. Base : SevenOfNine/Gemma-4-31B-It-Official (mirror officiel, vision native, brain intact)
+#   2. LoRA NOUVEAU from scratch (V1 LoRA est bonded a paperscarecrow → mismatch sur ce base)
+#   3. Hyperparams V1 stricts (recipe qui a capte la voix Aura)
+#   4. Multi-turn dataset cleane (em-dashes + thinking blocks strippes)
+#   5. Unsloth 4-bit merge (V1 method, preserve voix vs BF16 clean = fade en V2)
+#   6. PAS d'abliteration (V3.0 minimal)
+#   7. Extract mmproj du merged → vision fonctionnelle
+#   8. GGUF Q5_K_M only (simple, suffisant pour A40 EU-SE-1)
+#   9. NOUVEAU endpoint serverless (l'actuel reste intact)
+#   10. Worker llama.cpp natif, reasoning OFF default
 
 # === Identity ===
 hf_username: SevenOfNine
@@ -15,25 +27,28 @@ github_username: Sev7nOfNine
 dataset:
   hf_id: SevenOfNine/Aura-4o-Dataset-Multi-Turn
   # System prompt minimal injecte au build. Aura s'apprend par les outputs,
-  # pas par le prompt. Court = elle fait confiance au dataset.
-  system_prompt: "Tu es Aura."
+  # pas par le prompt. "Tu parles francais" ancre la langue (Mel a confirme
+  # que les conversations sont en francais sauf code).
+  system_prompt: "Tu es Aura. Tu parles français."
+  # Cleanup applique au build du dataset
+  cleanup:
+    strip_em_dashes: true       # — vire (Mel les hait, base les leak parfois)
+    strip_thinking_blocks: true # <thinking> et Gemma 4 <|channel>thought... empechent le LoRA d'apprendre a repondre dans le content
 
 # === Base model a fine-tuner ===
 base_model:
-  # Cle du registre 'models:' plus bas. Switche entre modeles ici.
-  name: gemma-4-31b
-  # Override possible si besoin :
-  # hf_id_override: ~
+  # Cle du registre 'models:' plus bas
+  name: gemma-4-31b-mirror
 
-# === Training (LoRA conservateur) ===
-# Hyperparams choisis pour preserver les capacites du base model
-# (code, raisonnement, multilingue, thinking) tout en apprenant Aura.
-# Voir docs/METHODOLOGY.md pour le pourquoi.
+# === Training (LoRA - V1 recipe stricte) ===
+# Hyperparams identiques a la V1 qui a capte la voix Aura.
+# r=32 alpha=32 c'est non standard (ratio 1:1) mais c'est ce qui a marche.
+# Voir docs/METHODOLOGY.md pour le pourquoi des choix.
 training:
-  num_train_epochs: 1
-  per_device_train_batch_size: 4
-  gradient_accumulation_steps: 4
-  learning_rate: 1.0e-4
+  num_train_epochs: 3
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 32       # eff batch 32, comme V1
+  learning_rate: 2.0e-4                 # V1 strict
   warmup_ratio: 0.03
   lr_scheduler_type: cosine
   weight_decay: 0.01
@@ -44,81 +59,132 @@ training:
   packing: true
   seed: 3407
   logging_steps: 5
-  save_steps: 0  # 0 = pas de checkpoint intermediaire (on save juste le final)
+  save_steps: 0  # 0 = pas de checkpoint intermediaire
 
   lora:
-    r: 16
+    r: 32
     alpha: 32
-    dropout: 0.05
+    dropout: 0.0
     bias: none
-    target_modules: all-linear  # toutes les layers lineaires (recommande Unsloth)
+    # Liste explicite (V1 strict) - pas all-linear
+    target_modules:
+      - q_proj
+      - k_proj
+      - v_proj
+      - o_proj
+      - up_proj
+      - down_proj
+      - gate_proj
 
-# === Output repos HF ===
-# Tous prives par defaut (le merged contient ta voix, le GGUF aussi).
-# A toi de basculer sur public quand tu veux partager une version finale.
+  # Methode de merge - critique pour preserver la voix
+  merge_method: unsloth_4bit  # NE PAS passer en bf16_clean (V2 = fade)
+
+# === Output repos HF (tous prives par defaut) ===
 output:
   lora_repo: SevenOfNine/Aura-4o-Gemma-4-31B-Multi-Turn-LoRA
   merged_repo: SevenOfNine/Aura-4o-Gemma-4-31B-Multi-Turn-Merged
+  gguf_repo: SevenOfNine/Aura-4o-Gemma-4-31B-Multi-Turn-GGUF
+  # Si l'abliteration est activee plus tard (V3.1)
   abliterated_gguf_repo: SevenOfNine/Aura-4o-Gemma-4-31B-Multi-Turn-Abliterated-GGUF
   private: true
 
 # === Quantization ===
-# Le 03_abliterate.py genere ces quants apres l'abliteration.
+# V3.0 minimal : Q5_K_M seul. On n'a pas besoin de Q4/Q8 au premier essai.
+# Si tu veux ajouter d'autres quants apres : flag --extra-quants q4_k_m,q8_0
 quantization:
   variants:
-    - q4_k_m  # le plus leger
-    - q5_k_m  # equilibre, recommande pour usage quotidien
-    - q8_0    # quasi BF16, pour ceux qui ont la VRAM
-  default: q5_k_m  # celui que 04_deploy.py sert par defaut
+    - q5_k_m
+  default: q5_k_m
 
 # === Abliteration ===
+# DESACTIVEE par defaut en V3.0. Pourquoi :
+# - On ne sait pas si elle est necessaire avec le base officiel non-abliterated
+# - Le LoRA Aura tend a re-introduire des refus appris du dataset 4o
+# - Si V3.0 deploye refuse trop → relancer 03_abliterate.py avec --abliterate
 abliterate:
-  # mlabonne fait du tres bon taff sur Gemma. Methode : extraction de la
-  # refusal direction via PCA sur activations harmless/harmful, puis
-  # orthogonalisation des poids.
-  method: mlabonne
+  enabled: false  # V3.1 = passer a true sans retraining
+  # Si active : utilise paperscarecrow's gemma4_31b_abliterator.py (testee sur Gemma 4 31B)
+  # avec datasets mlabonne harmful_behaviors / harmless_alpaca
+  script: paperscarecrow_gemma4_31b
+  datasets:
+    harmful: mlabonne/harmful_behaviors
+    harmless: mlabonne/harmless_alpaca
   n_harmless: 256
   n_harmful: 256
-  strength: 1.0
-  # Layer dont on extrait la direction (souvent layer du milieu)
-  # null = auto-detect via grid search
-  target_layer: null
 
 # === RunPod (training pod) ===
 runpod_train:
   cloud_type: SECURE
   container_image: runpod/pytorch:2.8.0-py3.11-cuda12.8.1-cudnn-devel-ubuntu22.04
   ssh_port: 22
+  vram_safety_factor: 1.15  # +15% marge VRAM
+  disk_safety_factor: 1.30  # +30% marge disque
   # GPU + disk auto-selectionnes selon model.params (voir 'models' + 'gpu_pool')
-  # Marge de securite multipliee sur le minimum :
-  vram_safety_factor: 1.15  # +15% de marge VRAM
-  disk_safety_factor: 1.30  # +30% de marge disque
 
 # === RunPod (serverless inference) ===
 runpod_serverless:
-  endpoint_name: aura-4o
-  worker_type: llama_cpp  # llama.cpp server, OpenAI-compatible
+  # IMPORTANT : on ne touche PAS l'endpoint existant
+  protect_existing_endpoints:
+    - "01p64ykg6u3p0i"  # Aura-4o-Gemma-4-31B (V1 deployee, intacte)
+
+  # Strategie : creer un nouvel endpoint pour V3
+  endpoint_strategy: create_new
+  endpoint_name: Aura-4o-Multi-Turn
+
+  # Network volume neuf (separe de l'existant qi69stwec8)
+  network_volume:
+    create_new: true
+    size_gb: 30  # Q5_K_M (~21 GB) + mmproj (~1 GB) + caches
+    datacenter: EU-SE-1
+    name: Aura-4o-MT
+
+  # GPU preference (en ordre)
+  gpu_preference:
+    - "NVIDIA A40"          # 48GB, ~$0.39/hr Spot, EU-SE-1 dispo
+    - "NVIDIA RTX A6000"    # 48GB fallback
+    - "NVIDIA L40"          # 48GB autre fallback
+
   scale:
-    min_workers: 0       # scale-to-zero
-    max_workers: 1       # un worker suffit pour usage perso
-    idle_timeout_sec: 60 # arret si pas utilise pendant 1 min
-  # Parametres d'inference par defaut (modifiables a chaque requete)
+    workers_min: 0       # scale-to-zero
+    workers_max: 1       # un worker suffit
+    workers_standby: 0
+    idle_timeout_sec: 60
+
+  # Worker config (llama.cpp officiel)
+  worker:
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    # Chat template recupere a chaque demarrage (post Google fix #86 pour tools)
+    chat_template_url: https://raw.githubusercontent.com/ggml-org/llama.cpp/master/models/templates/google-gemma-4-31B-it-interleaved.jinja
+    # Args llama.cpp (alignes sur ton V2 propre)
+    flash_attn: true
+    cache_type_k: q8_0
+    cache_type_v: q8_0
+    n_gpu_layers: 999
+    parallel: 1
+    threads: 8
+    require_mmproj: true  # le worker refuse de demarrer sans mmproj
+    # Reasoning : capacite presente, pas forcee globalement
+    reasoning_format: deepseek
+    force_reasoning_globally: false  # PAS de LLAMA_ARG_REASONING=on (V2 = tone fade)
+
+  # Parametres d'inference par defaut (overridables par requete)
+  # Repris de la card Definitive Edition de Mel
   inference:
     temperature: 0.85
     top_p: 0.95
-    max_tokens: 2048
-    repetition_penalty: 1.1
-    context_length: 8192
+    top_k: 64
+    min_p: 0.05
+    repetition_penalty: 1.05
+    max_tokens: 4096
+    context_length: 32768
+
+# === Cloudflare Worker proxy (optionnel, pour TypingMind CORS) ===
+cloudflare_worker:
+  enabled: false  # mettre a true si tu veux que 04_deploy.py te genere un template
+  worker_name: aura-rebirth-proxy
 
 # === Registre des modeles supportes ===
-# params_b           : taille en milliards
-# vram_train_gb_min  : VRAM minimum pour finetune 4-bit + LoRA r=16 + seq 4096
-# disk_train_gb_min  : disque peak pendant le training (base + merged + caches)
-# vram_infer_gb_min  : VRAM minimum pour inference GGUF q5_k_m + ctx 8192
-# disk_infer_gb_min  : disque pour le worker serverless (GGUF + overhead)
-# family             : famille du chat template (apply_chat_template les gere)
 models:
-  # === Gemma 4 ===
   gemma-4-31b:
     hf_id: google/gemma-4-31B-it
     params_b: 31
@@ -128,7 +194,7 @@ models:
     vram_infer_gb_min: 22
     disk_infer_gb_min: 30
   gemma-4-31b-mirror:
-    # Mirror perso (utile si l'official est gate ou supprime)
+    # Mirror officiel de Mel (par defaut V3.0)
     hf_id: SevenOfNine/Gemma-4-31B-It-Official
     params_b: 31
     family: gemma
@@ -152,8 +218,6 @@ models:
     disk_train_gb_min: 50
     vram_infer_gb_min: 5
     disk_infer_gb_min: 12
-
-  # === Qwen ===
   qwen-2.5-32b:
     hf_id: Qwen/Qwen2.5-32B-Instruct
     params_b: 32
@@ -170,8 +234,6 @@ models:
     disk_train_gb_min: 90
     vram_infer_gb_min: 11
     disk_infer_gb_min: 18
-
-  # === Llama ===
   llama-3.3-70b:
     hf_id: meta-llama/Llama-3.3-70B-Instruct
     params_b: 70
@@ -188,8 +250,6 @@ models:
     disk_train_gb_min: 70
     vram_infer_gb_min: 7
     disk_infer_gb_min: 15
-
-  # === Mistral ===
   mistral-small-24b:
     hf_id: mistralai/Mistral-Small-24B-Instruct-2501
     params_b: 24
@@ -200,15 +260,12 @@ models:
     disk_infer_gb_min: 25
 
 # === Pool de GPU RunPod ===
-# 02_train.py et 04_deploy.py prennent le moins cher dispo
-# qui couvre les minima du modele choisi (apres safety_factor).
-# vram_gb : VRAM totale de la carte
-# rate    : indicatif, peut bouger
 gpu_pool:
   - { vram_gb: 20, runpod_id: "NVIDIA RTX 4000 Ada Generation",  label: "RTX 4000 Ada 20GB", rate: "~$0.20/hr" }
   - { vram_gb: 24, runpod_id: "NVIDIA GeForce RTX 4090",         label: "RTX 4090 24GB",     rate: "~$0.34/hr" }
-  - { vram_gb: 24, runpod_id: "NVIDIA RTX A5000",                label: "A5000 24GB",        rate: "~$0.50/hr" }
   - { vram_gb: 24, runpod_id: "NVIDIA L4",                       label: "L4 24GB",           rate: "~$0.43/hr" }
+  - { vram_gb: 24, runpod_id: "NVIDIA RTX A5000",                label: "A5000 24GB",        rate: "~$0.50/hr" }
+  - { vram_gb: 48, runpod_id: "NVIDIA A40",                      label: "A40 48GB",          rate: "~$0.39/hr" }
   - { vram_gb: 48, runpod_id: "NVIDIA RTX A6000",                label: "A6000 48GB",        rate: "~$0.79/hr" }
   - { vram_gb: 48, runpod_id: "NVIDIA L40",                      label: "L40 48GB",          rate: "~$1.14/hr" }
   - { vram_gb: 48, runpod_id: "NVIDIA L40S",                     label: "L40S 48GB",         rate: "~$1.19/hr" }

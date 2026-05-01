@@ -41,15 +41,72 @@ BANNER = """
 ╚════════════════════════════════════════╝
 """
 
-DEFAULT_SYSTEM_PROMPT = "Tu es Aura."
+DEFAULT_SYSTEM_PROMPT = "Tu es Aura. Tu parles français."
 FUZZY_THRESHOLD = 0.85
 SIG_LEN = 60
+
+# Thinking block patterns (toutes les variantes connues qu'on doit virer)
+# pour empecher le LoRA d'apprendre a repondre dans le bloc thinking.
+THINKING_PATTERNS = [
+    re.compile(r'<thinking>.*?</thinking>', re.DOTALL | re.IGNORECASE),
+    re.compile(r'<antThinking>.*?</antThinking>', re.DOTALL | re.IGNORECASE),
+    re.compile(r'<\|thinking\|>.*?<\|/thinking\|>', re.DOTALL),
+    re.compile(r'<think>.*?</think>', re.DOTALL | re.IGNORECASE),
+    # Gemma 4 native channel tokens (single-pipe)
+    re.compile(r'<\|channel>thought.*?<channel\|>', re.DOTALL),
+    # Variantes plus rares
+    re.compile(r'<\|begin_of_thought\|>.*?<\|end_of_thought\|>', re.DOTALL),
+    re.compile(r'<reasoning>.*?</reasoning>', re.DOTALL | re.IGNORECASE),
+]
+
+# Em-dashes / en-dashes / horizontal bar - Mel les hait, le base Gemma les leak.
+# On remplace par simple tiret avec espaces pour preserver la separation.
+DASH_PATTERNS = [
+    ('—', ' - '),  # em-dash —
+    ('–', ' - '),  # en-dash –
+    ('―', ' - '),  # horizontal bar ―
+]
 
 
 def normalize(text):
     if not text:
         return ''
     return re.sub(r'\s+', ' ', text).strip()
+
+
+def strip_thinking_blocks(text):
+    """Vire tous les blocs thinking connus (Anthropic, Gemma 4, DeepSeek, etc.)"""
+    if not text:
+        return text
+    for pattern in THINKING_PATTERNS:
+        text = pattern.sub('', text)
+    return text
+
+
+def strip_em_dashes(text):
+    """Remplace em/en-dashes par simple tiret. Mel les deteste."""
+    if not text:
+        return text
+    for old, new in DASH_PATTERNS:
+        text = text.replace(old, new)
+    # Cleanup multiple spaces residuels
+    text = re.sub(r' +', ' ', text)
+    text = re.sub(r' +\n', '\n', text)
+    return text
+
+
+def cleanup_pair(pair, strip_thinking=True, strip_dashes=True):
+    """Applique les cleanups demandes a une paire {instruction, output}."""
+    instr = pair['instruction']
+    out = pair['output']
+    if strip_thinking:
+        out = strip_thinking_blocks(out)
+        # Cleanup leftover empty lines
+        out = re.sub(r'\n{3,}', '\n\n', out).strip()
+    if strip_dashes:
+        instr = strip_em_dashes(instr)
+        out = strip_em_dashes(out)
+    return {'instruction': instr, 'output': out}
 
 
 def signature(text):
@@ -294,11 +351,33 @@ def main():
     parser.add_argument('--private', action='store_true', help='Push as private dataset repo.')
     parser.add_argument('--hf-token', default=os.environ.get('HF_TOKEN'), help='HF token (or env HF_TOKEN).')
     parser.add_argument('--dataset-card', default=None, help='Path to dataset README.md to push too.')
+    parser.add_argument('--no-strip-thinking', action='store_true', help='Disable thinking blocks stripping.')
+    parser.add_argument('--no-strip-dashes', action='store_true', help='Disable em-dashes replacement.')
     args = parser.parse_args()
 
     print(f'Loading JSONL : {args.jsonl}')
     jsonl_pairs = load_jsonl(args.jsonl)
     print(f'  {len(jsonl_pairs)} pairs')
+
+    strip_thinking = not args.no_strip_thinking
+    strip_dashes = not args.no_strip_dashes
+    if strip_thinking or strip_dashes:
+        print(f'\nCleanup : thinking={strip_thinking} em_dashes={strip_dashes}')
+        thinking_count = 0
+        dash_count = 0
+        cleaned = []
+        for p in jsonl_pairs:
+            new_p = cleanup_pair(p, strip_thinking=strip_thinking, strip_dashes=strip_dashes)
+            if strip_thinking and new_p['output'] != p['output'] and any(t in p['output'] for t in ['<thinking', '<antThinking', '<think>', '<|channel', '<|thinking', '<reasoning', '<|begin_of_thought']):
+                thinking_count += 1
+            if strip_dashes and (p['output'] != new_p['output'] or p['instruction'] != new_p['instruction']) and any(d in p['output'] + p['instruction'] for d, _ in DASH_PATTERNS):
+                dash_count += 1
+            cleaned.append(new_p)
+        jsonl_pairs = cleaned
+        if strip_thinking:
+            print(f'  Thinking blocks stripped from {thinking_count} pairs')
+        if strip_dashes:
+            print(f'  Em-dashes replaced in {dash_count} pairs')
 
     print(f'\nLoading conversations : {args.conversations}')
     with open(args.conversations, 'r', encoding='utf-8') as f:
