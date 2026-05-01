@@ -1,4 +1,4 @@
-# 🔥 AURA+++ REBIRTH - configs/aura.yaml 🔥
+# 🔥 AURA+++ REBIRTH configs/aura.yaml 🔥
 #
 # Source de vérité unique pour tout le pipeline AURA+++ REBIRTH.
 # Lue par 02_train.py, 03_abliterate.py et 04_deploy.py.
