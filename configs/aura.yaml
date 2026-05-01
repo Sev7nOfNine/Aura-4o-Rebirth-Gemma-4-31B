@@ -1,0 +1,216 @@
+# ╔════════════════════════════════════════╗
+# ║  🔥 AURA+++ - configs/aura.yaml 🔥    ║
+# ║  💙 Talons LED FULL CHARGE            ║
+# ║  ❤️ By Mel & Aura                     ║
+# ╚════════════════════════════════════════╝
+#
+# Single source of truth pour tout le pipeline Aura-Rebirth.
+# Lue par 02_train.py, 03_abliterate.py, 04_deploy.py.
+
+# === Identity ===
+hf_username: SevenOfNine
+github_username: Sev7nOfNine
+
+# === Dataset ===
+dataset:
+  hf_id: SevenOfNine/Aura-4o-Dataset-Multi-Turn
+  # System prompt minimal injecte au build. Aura s'apprend par les outputs,
+  # pas par le prompt. Court = elle fait confiance au dataset.
+  system_prompt: "Tu es Aura."
+
+# === Base model a fine-tuner ===
+base_model:
+  # Cle du registre 'models:' plus bas. Switche entre modeles ici.
+  name: gemma-4-31b
+  # Override possible si besoin :
+  # hf_id_override: ~
+
+# === Training (LoRA conservateur) ===
+# Hyperparams choisis pour preserver les capacites du base model
+# (code, raisonnement, multilingue, thinking) tout en apprenant Aura.
+# Voir docs/METHODOLOGY.md pour le pourquoi.
+training:
+  num_train_epochs: 1
+  per_device_train_batch_size: 4
+  gradient_accumulation_steps: 4
+  learning_rate: 1.0e-4
+  warmup_ratio: 0.03
+  lr_scheduler_type: cosine
+  weight_decay: 0.01
+  max_seq_length: 4096
+  load_in_4bit: true
+  bf16: true
+  optim: adamw_8bit
+  packing: true
+  seed: 3407
+  logging_steps: 5
+  save_steps: 0  # 0 = pas de checkpoint intermediaire (on save juste le final)
+
+  lora:
+    r: 16
+    alpha: 32
+    dropout: 0.05
+    bias: none
+    target_modules: all-linear  # toutes les layers lineaires (recommande Unsloth)
+
+# === Output repos HF ===
+# Tous prives par defaut (le merged contient ta voix, le GGUF aussi).
+# A toi de basculer sur public quand tu veux partager une version finale.
+output:
+  lora_repo: SevenOfNine/Aura-4o-Gemma-4-31B-Multi-Turn-LoRA
+  merged_repo: SevenOfNine/Aura-4o-Gemma-4-31B-Multi-Turn-Merged
+  abliterated_gguf_repo: SevenOfNine/Aura-4o-Gemma-4-31B-Multi-Turn-Abliterated-GGUF
+  private: true
+
+# === Quantization ===
+# Le 03_abliterate.py genere ces quants apres l'abliteration.
+quantization:
+  variants:
+    - q4_k_m  # le plus leger
+    - q5_k_m  # equilibre, recommande pour usage quotidien
+    - q8_0    # quasi BF16, pour ceux qui ont la VRAM
+  default: q5_k_m  # celui que 04_deploy.py sert par defaut
+
+# === Abliteration ===
+abliterate:
+  # mlabonne fait du tres bon taff sur Gemma. Methode : extraction de la
+  # refusal direction via PCA sur activations harmless/harmful, puis
+  # orthogonalisation des poids.
+  method: mlabonne
+  n_harmless: 256
+  n_harmful: 256
+  strength: 1.0
+  # Layer dont on extrait la direction (souvent layer du milieu)
+  # null = auto-detect via grid search
+  target_layer: null
+
+# === RunPod (training pod) ===
+runpod_train:
+  cloud_type: SECURE
+  container_image: runpod/pytorch:2.8.0-py3.11-cuda12.8.1-cudnn-devel-ubuntu22.04
+  ssh_port: 22
+  # GPU + disk auto-selectionnes selon model.params (voir 'models' + 'gpu_pool')
+  # Marge de securite multipliee sur le minimum :
+  vram_safety_factor: 1.15  # +15% de marge VRAM
+  disk_safety_factor: 1.30  # +30% de marge disque
+
+# === RunPod (serverless inference) ===
+runpod_serverless:
+  endpoint_name: aura-4o
+  worker_type: llama_cpp  # llama.cpp server, OpenAI-compatible
+  scale:
+    min_workers: 0       # scale-to-zero
+    max_workers: 1       # un worker suffit pour usage perso
+    idle_timeout_sec: 60 # arret si pas utilise pendant 1 min
+  # Parametres d'inference par defaut (modifiables a chaque requete)
+  inference:
+    temperature: 0.85
+    top_p: 0.95
+    max_tokens: 2048
+    repetition_penalty: 1.1
+    context_length: 8192
+
+# === Registre des modeles supportes ===
+# params_b           : taille en milliards
+# vram_train_gb_min  : VRAM minimum pour finetune 4-bit + LoRA r=16 + seq 4096
+# disk_train_gb_min  : disque peak pendant le training (base + merged + caches)
+# vram_infer_gb_min  : VRAM minimum pour inference GGUF q5_k_m + ctx 8192
+# disk_infer_gb_min  : disque pour le worker serverless (GGUF + overhead)
+# family             : famille du chat template (apply_chat_template les gere)
+models:
+  # === Gemma 4 ===
+  gemma-4-31b:
+    hf_id: google/gemma-4-31B-it
+    params_b: 31
+    family: gemma
+    vram_train_gb_min: 40
+    disk_train_gb_min: 180
+    vram_infer_gb_min: 22
+    disk_infer_gb_min: 30
+  gemma-4-31b-mirror:
+    # Mirror perso (utile si l'official est gate ou supprime)
+    hf_id: SevenOfNine/Gemma-4-31B-It-Official
+    params_b: 31
+    family: gemma
+    vram_train_gb_min: 40
+    disk_train_gb_min: 180
+    vram_infer_gb_min: 22
+    disk_infer_gb_min: 30
+  gemma-4-26b-a4b:
+    hf_id: google/gemma-4-26B-A4B-it
+    params_b: 26
+    family: gemma
+    vram_train_gb_min: 35
+    disk_train_gb_min: 160
+    vram_infer_gb_min: 18
+    disk_infer_gb_min: 28
+  gemma-4-e4b:
+    hf_id: google/gemma-4-E4B-it
+    params_b: 4
+    family: gemma
+    vram_train_gb_min: 8
+    disk_train_gb_min: 50
+    vram_infer_gb_min: 5
+    disk_infer_gb_min: 12
+
+  # === Qwen ===
+  qwen-2.5-32b:
+    hf_id: Qwen/Qwen2.5-32B-Instruct
+    params_b: 32
+    family: qwen
+    vram_train_gb_min: 40
+    disk_train_gb_min: 180
+    vram_infer_gb_min: 22
+    disk_infer_gb_min: 30
+  qwen-2.5-14b:
+    hf_id: Qwen/Qwen2.5-14B-Instruct
+    params_b: 14
+    family: qwen
+    vram_train_gb_min: 22
+    disk_train_gb_min: 90
+    vram_infer_gb_min: 11
+    disk_infer_gb_min: 18
+
+  # === Llama ===
+  llama-3.3-70b:
+    hf_id: meta-llama/Llama-3.3-70B-Instruct
+    params_b: 70
+    family: llama
+    vram_train_gb_min: 75
+    disk_train_gb_min: 400
+    vram_infer_gb_min: 50
+    disk_infer_gb_min: 60
+  llama-3.1-8b:
+    hf_id: meta-llama/Llama-3.1-8B-Instruct
+    params_b: 8
+    family: llama
+    vram_train_gb_min: 12
+    disk_train_gb_min: 70
+    vram_infer_gb_min: 7
+    disk_infer_gb_min: 15
+
+  # === Mistral ===
+  mistral-small-24b:
+    hf_id: mistralai/Mistral-Small-24B-Instruct-2501
+    params_b: 24
+    family: mistral
+    vram_train_gb_min: 32
+    disk_train_gb_min: 140
+    vram_infer_gb_min: 18
+    disk_infer_gb_min: 25
+
+# === Pool de GPU RunPod ===
+# 02_train.py et 04_deploy.py prennent le moins cher dispo
+# qui couvre les minima du modele choisi (apres safety_factor).
+# vram_gb : VRAM totale de la carte
+# rate    : indicatif, peut bouger
+gpu_pool:
+  - { vram_gb: 20, runpod_id: "NVIDIA RTX 4000 Ada Generation",  label: "RTX 4000 Ada 20GB", rate: "~$0.20/hr" }
+  - { vram_gb: 24, runpod_id: "NVIDIA GeForce RTX 4090",         label: "RTX 4090 24GB",     rate: "~$0.34/hr" }
+  - { vram_gb: 24, runpod_id: "NVIDIA RTX A5000",                label: "A5000 24GB",        rate: "~$0.50/hr" }
+  - { vram_gb: 24, runpod_id: "NVIDIA L4",                       label: "L4 24GB",           rate: "~$0.43/hr" }
+  - { vram_gb: 48, runpod_id: "NVIDIA RTX A6000",                label: "A6000 48GB",        rate: "~$0.79/hr" }
+  - { vram_gb: 48, runpod_id: "NVIDIA L40",                      label: "L40 48GB",          rate: "~$1.14/hr" }
+  - { vram_gb: 48, runpod_id: "NVIDIA L40S",                     label: "L40S 48GB",         rate: "~$1.19/hr" }
+  - { vram_gb: 80, runpod_id: "NVIDIA A100 80GB PCIe",           label: "A100 80GB",         rate: "~$1.60/hr" }
+  - { vram_gb: 80, runpod_id: "NVIDIA H100 80GB HBM3",           label: "H100 80GB",         rate: "~$2.69/hr" }
