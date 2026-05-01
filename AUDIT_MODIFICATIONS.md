@@ -31,7 +31,7 @@ Les commandes documentees correspondent maintenant aux CLI reelles:
 python pipeline/03_abliterate.py
 python pipeline/03_abliterate.py --abliterate
 python pipeline/03_abliterate.py --extra-quants q4_k_m,q8_0
-python pipeline/04_deploy.py --worker-image sev7nofnine/aura-rebirth-worker:latest
+python pipeline/04_deploy.py --worker-image ghcr.io/sev7nofnine/aura-rebirth-worker:latest
 ```
 
 Verification:
@@ -120,9 +120,9 @@ Le bloc deploiement faisait:
 
 ```bash
 cd runpod/inference_worker
-docker build -t sev7nofnine/aura-rebirth-worker:latest .
-docker push sev7nofnine/aura-rebirth-worker:latest
-python pipeline/04_deploy.py --worker-image sev7nofnine/aura-rebirth-worker:latest
+docker build -t ghcr.io/sev7nofnine/aura-rebirth-worker:latest .
+docker push ghcr.io/sev7nofnine/aura-rebirth-worker:latest
+python pipeline/04_deploy.py --worker-image ghcr.io/sev7nofnine/aura-rebirth-worker:latest
 ```
 
 Apres le `cd`, la commande `python pipeline/04_deploy.py` ne partait plus de la racine du depot et aurait echoue.
@@ -130,9 +130,9 @@ Apres le `cd`, la commande `python pipeline/04_deploy.py` ne partait plus de la 
 Correction appliquee:
 
 ```bash
-docker build -t sev7nofnine/aura-rebirth-worker:latest runpod/inference_worker
-docker push sev7nofnine/aura-rebirth-worker:latest
-python pipeline/04_deploy.py --worker-image sev7nofnine/aura-rebirth-worker:latest
+docker build -t ghcr.io/sev7nofnine/aura-rebirth-worker:latest runpod/inference_worker
+docker push ghcr.io/sev7nofnine/aura-rebirth-worker:latest
+python pipeline/04_deploy.py --worker-image ghcr.io/sev7nofnine/aura-rebirth-worker:latest
 ```
 
 Le bloc complet reste maintenant executable depuis la racine du repo.
@@ -174,10 +174,11 @@ Findings additionnels traites apres recheck :
 - `b35f6bd` : pas de double stockage (`volume_in_gb=0`), datacenter `EU-SE-1` pinne, `disk_train_gb_min` revus a la baisse pour tous les modeles du registre
 - workflow GHCR : tags forces en lowercase (`ghcr.io/sev7nofnine/...`) car `github.repository_owner` (`Sev7nOfNine`) contient des majuscules invalides en nom Docker
 - `README.md` : aligne sur GHCR (`ghcr.io/sev7nofnine/aura-rebirth-worker:latest`) au lieu du naming Docker Hub style
+- `runpod/inference_worker/Dockerfile` : build Docker compatible PEP 668 avec `PIP_BREAK_SYSTEM_PACKAGES=1`
 
 ## Prochaines Etapes Recommandees
 
-1. Commit/push le microfix README et ce fichier d'audit.
+1. Verifier que le workflow `Build & Push Worker Image` repasse au vert.
 2. Lancer un dry-run training:
 
 ```bash

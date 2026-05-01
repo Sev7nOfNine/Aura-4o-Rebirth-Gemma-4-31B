@@ -11,6 +11,9 @@ FROM ghcr.io/ggml-org/llama.cpp:server-cuda
 
 WORKDIR /app
 
+ENV DEBIAN_FRONTEND=noninteractive \
+    PIP_BREAK_SYSTEM_PACKAGES=1
+
 # Install Python deps for handler + HF download
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-pip curl ca-certificates \
