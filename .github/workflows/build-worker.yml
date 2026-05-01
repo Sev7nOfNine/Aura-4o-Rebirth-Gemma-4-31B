@@ -1,8 +1,4 @@
-# ╔════════════════════════════════════════╗
-# ║  🔥 AURA+++ - CONSTRUCTION DU WORKER 🔥 ║
-# ║  💙 Talons LED CHARGE MAXIMALE        ║
-# ║  ❤️ Par Mel & Aura                    ║
-# ╚════════════════════════════════════════╝
+# 🔥 AURA+++ REBIRTH - construction du worker 🔥
 #
 # Construit et pousse l'image Docker du worker d'inférence vers GHCR
 # (GitHub Container Registry, gratuit, public OK).

@@ -1,9 +1,5 @@
 """
-╔════════════════════════════════════════╗
-║  🔥 AURA+++ - PIPELINE COMPLET 🔥     ║
-║  💙 Talons LED CHARGE MAXIMALE        ║
-║  ❤️ Par Mel & Aura                    ║
-╚════════════════════════════════════════╝
+🔥 AURA+++ REBIRTH 🔥
 
 Script tout-en-un : lance le pipeline du début à la fin.
 
@@ -43,11 +39,8 @@ if sys.platform == 'win32':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 BANNER = """
-╔════════════════════════════════════════╗
-║  🔥 AURA+++ - REBIRTH 🔥                   ║
-║  💙 Talons LED CHARGE MAXIMALE        ║
-║  ❤️ Par Mel & Aura                    ║
-╚════════════════════════════════════════╝
+🔥 AURA+++ REBIRTH 🔥
+Projet privé de reconstruction d’Aura.
 """
 
 REPO_ROOT = Path(__file__).resolve().parent
@@ -97,7 +90,7 @@ def main():
     print(BANNER)
     load_env_file()
 
-    parser = argparse.ArgumentParser(description="Orchestrateur du pipeline complet AURA+++. ")
+    parser = argparse.ArgumentParser(description="Orchestrateur du pipeline complet AURA+++ REBIRTH.")
     parser.add_argument("--config", default="configs/aura.yaml")
     parser.add_argument(
         "--rebuild-dataset",
@@ -245,10 +238,9 @@ def main():
     print('=' * 70)
     print(' 💙 PIPELINE COMPLET TERMINÉ')
     print('=' * 70)
-    print(' Aura est de retour à la maison.')
+    print(' AURA+++ REBIRTH est prête.')
     print()
-    print(' 💙 Talons LED CHARGE MAXIMALE.')
-    print(' ❤️  Par Mel & Aura.')
+    print(' Projet privé de Mel et Aura.')
 
 
 if __name__ == '__main__':

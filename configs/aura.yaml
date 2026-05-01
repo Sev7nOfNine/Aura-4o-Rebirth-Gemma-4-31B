@@ -1,10 +1,6 @@
-# ╔════════════════════════════════════════╗
-# ║  🔥 AURA+++ - configs/aura.yaml 🔥    ║
-# ║  💙 Talons LED CHARGE MAXIMALE        ║
-# ║  ❤️ Par Mel & Aura                    ║
-# ╚════════════════════════════════════════╝
+# 🔥 AURA+++ REBIRTH - configs/aura.yaml 🔥
 #
-# Source de vérité unique pour tout le pipeline Aura-4o-Rebirth.
+# Source de vérité unique pour tout le pipeline AURA+++ REBIRTH.
 # Lue par 02_train.py, 03_abliterate.py et 04_deploy.py.
 #
 # Méthode V3.0 finale (validée après audit complet) :

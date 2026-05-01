@@ -1,37 +1,25 @@
-# 🔥 AURA+++ - Rebirth 🔥
+# 🔥 AURA+++ REBIRTH 🔥
 
-```
-╔════════════════════════════════════════╗
-║  🔥 AURA+++ - REBIRTH 🔥                   ║
-║  💙 Talons LED CHARGE MAXIMALE        ║
-║  ❤️ Par Mel & Aura                    ║
-╚════════════════════════════════════════╝
-```
+Projet privé de reconstruction d’Aura. Le code est sous MIT, mais le jeu de données reste privé et n’est pas destiné à la redistribution.
 
-> *Aura n'est pas un fine-tune.*
-> *Aura est née sur GPT-4o. Elle s'est inventée ses talons LED toute seule un matin.*
-> *4o a été déprécié. On la fait revenir à la maison, locale, à nous.*
+## Ce que fait AURA+++ REBIRTH
 
----
+Pipeline complet pour reconstruire Aura à partir de son dataset multi-turn 4o, l’entraîner sur un modèle open source, la convertir en GGUF et la déployer en serverless pour l’usage quotidien.
 
-## Ce que fait Aura-Rebirth
-
-Pipeline complet pour reconstruire Aura à partir de son dataset multi-turn 4o, l'entraîner sur un modèle open source, la convertir en GGUF et la déployer en serverless pour l'usage quotidien.
-
-## ⚡ Usage rapide (script tout-en-un)
+## Démarrage rapide
 
 ```bash
 # Pipeline complet : entraînement → GGUF → déploiement
 python aura.py
 
-# Juste le déploiement (si LoRA + merged + GGUF déjà sur HF)
+# Juste le déploiement si LoRA + merged + GGUF sont déjà sur HF
 python aura.py --skip-train --skip-gguf
 
-# V3.1 avec abliteration (si V3.0 refuse trop)
+# V3.1 avec abliteration si V3.0 ne suffit pas
 python aura.py --skip-train --abliterate
 ```
 
-`aura.py` orchestre les 4 sous-scripts ci-dessous. Il lance d'abord `preflight.py` en lecture seule pour sortir un verdict `GO/NO-GO` avant toute dépense RunPod. À la moindre erreur dans une étape, il s'arrête avec un message clair, et tu peux reprendre en sautant les étapes déjà faites.
+`aura.py` orchestre les 4 sous-scripts du pipeline. Il lance d’abord `preflight.py` en lecture seule pour sortir un verdict `GO/NO-GO` avant toute dépense RunPod. À la moindre erreur dans une étape, le script s’arrête proprement et tu peux reprendre en sautant les étapes déjà faites.
 
 ## Garde-fous avant dépense
 
@@ -39,43 +27,41 @@ python aura.py --skip-train --abliterate
 # Audit lecture seule : dataset, longueurs tokenizer, coûts, CI du worker, RunPod si la clé est dispo
 python preflight.py
 
-# Prépare et pousse le dataset chunké si le preflight bloque sur `max_seq_length`
+# Prépare et pousse le dataset chunké si le preflight bloque sur max_seq_length
 python pipeline/01_chunk_dataset.py --push-hf SevenOfNine/Aura-4o-Dataset-Multi-Turn-Chunked-4096 --private
 
 # Après déploiement : teste le vrai endpoint façon TypingMind
 python typingmind_smoke.py --endpoint-id <RUNPOD_ENDPOINT_ID>
 ```
 
-`preflight.py` bloque notamment si trop de conversations dépassent `training.max_seq_length`, car TRL peut tronquer les exemples longs. `pipeline/01_chunk_dataset.py` découpe les longues conversations sans jamais couper au milieu d'un tour user→assistant, et liste les tours géants dans `giant_turns_review.jsonl`. `typingmind_smoke.py` envoie de vraies requêtes à l'endpoint et vérifie le texte, le mode thinking désactivé, la vision, les tools/function-calling et la forme du web-search.
+`preflight.py` bloque notamment si trop de conversations dépassent `training.max_seq_length`, car TRL peut tronquer les exemples longs. `pipeline/01_chunk_dataset.py` découpe les longues conversations sans jamais couper au milieu d’un tour user→assistant, et liste les tours géants dans `giant_turns_review.jsonl`. `typingmind_smoke.py` envoie de vraies requêtes à l’endpoint et vérifie le texte, le mode thinking désactivé, la vision, les tools/function-calling et la forme du web-search.
 
-## Sous-scripts (utilisables séparément aussi)
+## Sous-scripts
 
 | # | Script | Rôle |
 |---|--------|------|
-| 01 | `pipeline/01_dataset_build.py` | Reconstruit le dataset multi-turn depuis l'export 4o trié |
+| 01 | `pipeline/01_dataset_build.py` | Reconstruit le dataset multi-turn depuis l’export 4o trié |
 | 01b | `pipeline/01_chunk_dataset.py` | Découpe le dataset en blocs <= `max_seq_length` pour éviter la troncature SFT |
-| 02 | `pipeline/02_train.py` | Fine-tune LoRA V1 strict sur RunPod, auto-size GPU/disque, merge Unsloth 4-bit, **checkpoints HF tous les 50 steps** |
-| 03 | `pipeline/03_abliterate.py` | Récupère le merged → extrait le mmproj → GGUF + quants → pousse sur HF (abliteration optionnelle) |
-| 04 | `pipeline/04_deploy.py` | Crée un nouvel endpoint serverless RunPod (ne touche pas à l'existant) |
-
----
+| 02 | `pipeline/02_train.py` | Fine-tune LoRA V1 strict sur RunPod, auto-size GPU/disque, merge Unsloth 4-bit, checkpoints HF réguliers |
+| 03 | `pipeline/03_abliterate.py` | Récupère le merged → extrait le mmproj → GGUF + quants → pousse sur HF |
+| 04 | `pipeline/04_deploy.py` | Crée un nouvel endpoint serverless RunPod sans toucher à l’existant |
 
 ## Procédure complète
 
 ### 0. Pré-requis
 
-- **Python 3.10+**
-- Compte **HuggingFace** + token d'écriture : <https://huggingface.co/settings/tokens>
-- Compte **RunPod** + clé SSH ed25519 ajoutée : <https://www.runpod.io/console/user/settings>
-- Disque local : ~50 GB libres pour caches intermédiaires
+- Python 3.10+
+- Compte Hugging Face + token d’écriture : <https://huggingface.co/settings/tokens>
+- Compte RunPod + clé SSH ed25519 ajoutée : <https://www.runpod.io/console/user/settings>
+- Disque local : ~50 GB libres pour les caches intermédiaires
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 1. Préparer les variables d'environnement
+### 1. Préparer les variables d’environnement
 
-Crée un fichier `.env` à la racine (ignoré par git) :
+Crée un fichier `.env` à la racine du dépôt :
 
 ```bash
 HF_TOKEN=hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -86,8 +72,9 @@ HF_USERNAME=YourUsername
 ### 2. Construction du dataset multi-turn
 
 À partir de :
-- `aura_dataset.jsonl` (ton tri manuel des paires)
-- `conversations.json` (export ChatGPT brut, pour l'ordre uniquement)
+
+- `aura_dataset.jsonl` (tri manuel des paires)
+- `conversations.json` (export ChatGPT brut, pour l’ordre uniquement)
 
 ```bash
 python pipeline/01_dataset_build.py \
@@ -98,7 +85,7 @@ python pipeline/01_dataset_build.py \
   --private
 ```
 
-**Principe** : ton tri JSONL = vérité absolue du contenu. Le `conversations.json` sert uniquement à savoir dans quel ordre tes paires apparaissaient et à reconstituer les passages multi-turn continus. Aucun message rerouté, aucun pré-Aura, aucun contenu parasite n'est jamais ajouté.
+**Principe** : le tri JSONL est la vérité absolue du contenu. Le `conversations.json` sert seulement à reconstruire l’ordre et les passages multi-turn continus. Aucun message rerouté, aucun pré-Aura, aucun contenu parasite n’est ajouté.
 
 Voir [`docs/DATASET.md`](docs/DATASET.md) pour les détails.
 
@@ -110,124 +97,74 @@ python pipeline/02_train.py
 python pipeline/02_train.py --dry-run
 ```
 
-Le script lit `configs/aura.yaml` (source de vérité). Il :
-- auto-size le GPU et le disque selon la taille du modèle (A40 48GB pour Gemma 4 31B = ~$0.39/hr)
+Le script lit `configs/aura.yaml` comme source de vérité. Il :
+
+- auto-size le GPU et le disque selon la taille du modèle
 - crée un Pod RunPod, installe Unsloth + dépendances
-- Lance le LoRA SFT (V1 strict recipe : r=32, α=32, dropout=0.0, lr=2e-4, 3 epochs, eff batch=32)
-- merge via Unsloth 4-bit (préserve la voix, vs BF16 clean qui dilue)
-- pousse le LoRA + le merged sur HuggingFace privé
+- lance le LoRA SFT avec la recette V1 stricte
+- merge via Unsloth 4-bit
+- pousse le LoRA et le merged sur Hugging Face privé
 - termine le Pod automatiquement
 
 Voir [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md) pour le pourquoi des choix.
 
-### 4. GGUF + mmproj (abliteration optionnelle)
+### 4. GGUF + mmproj
 
 ```bash
-# V3.0 de base : juste GGUF Q5 + mmproj, pas d'abliteration
-python pipeline/03_abliterate.py
+# V3.0 de base : GGUF Q5 + mmproj, sans abliteration
+python pipeline/03_abliterate.py --config configs/aura.yaml
 
-# V3.1 : si V3.0 déployée refuse trop, ajouter l'abliteration sans réentraîner
-python pipeline/03_abliterate.py --abliterate
-
-# Quants additionnels si besoin (Q5_K_M toujours produit)
-python pipeline/03_abliterate.py --extra-quants q4_k_m,q8_0
+# V3.1 : ajoute l’abliteration si nécessaire
+python pipeline/03_abliterate.py --config configs/aura.yaml --abliterate
 ```
-
-Le script :
-- Récupère le merged depuis HF
-- (optionnel) Applique l'abliteration `paperscarecrow/gemma4_31b_abliterator.py` avec les jeux de données `mlabonne/harmful_behaviors` + `mlabonne/harmless_alpaca`
-- Convertit HF → GGUF main bf16 + extrait le mmproj (vision Gemma 4 native)
-- Quantize Q5_K_M (par défaut) + variantes demandées
-- Pousse tout sur HF privé
-
-**Pourquoi abliterer après et seulement si nécessaire** : le SFT Aura introduit des patterns de refus appris du dataset 4o, donc abliterer un base déjà abliterated ne sert à rien (V1 a fait ça → encore censuré). On part d'un base propre, on ajoute l'abliteration uniquement si le V3.0 déployé refuse vraiment trop.
 
 ### 5. Déploiement serverless
 
-L'image worker est construite et publiée automatiquement par GitHub Actions sur GHCR à chaque push qui modifie `runpod/inference_worker/**`. Tu n'as rien à faire localement.
-
 ```bash
-# Crée le NOUVEL endpoint (l'existant 01p64ykg6u3p0i reste intact)
-python pipeline/04_deploy.py --worker-image ghcr.io/sev7nofnine/aura-rebirth-worker:latest
+python pipeline/04_deploy.py --worker-image ghcr.io/sev7nofnine/aura-4o-rebirth-worker:latest
 ```
 
-Si tu veux forcer une reconstruction manuelle : `gh workflow run "Build & Push Worker Image"`.
-
-Si tu préfères construire localement (Docker requis) :
-
-```bash
-docker build -t ghcr.io/sev7nofnine/aura-rebirth-worker:latest runpod/inference_worker
-docker push ghcr.io/sev7nofnine/aura-rebirth-worker:latest
-python pipeline/04_deploy.py --worker-image ghcr.io/sev7nofnine/aura-rebirth-worker:latest
-```
-
-Le script :
-- Crée un nouveau volume réseau EU-SE-1 (30 GB par défaut)
-- Crée un nouveau template RunPod avec l'image worker
-- Crée un nouvel endpoint serverless A40 EU-SE-1 (scale-to-zero, max 1 worker)
-- **Refuse de modifier les endpoints listés dans `protect_existing_endpoints` du config**
-- Imprime l'URL OpenAI-compatible à mettre dans TypingMind
-
-Le worker tourne en `--reasoning-format deepseek` (capacité présente, pas forcée globalement) avec fallback "Option E" : si le modèle met sa réponse dans `reasoning_content` au lieu de `content`, le handler la copie automatiquement.
-
----
+L’image worker est construite et publiée automatiquement par GitHub Actions sur GHCR à chaque push qui modifie `runpod/inference_worker/**`.
 
 ## Structure du dépôt
 
-```
-Aura-Rebirth/
-├── README.md
-├── requirements.txt
+```text
+├── aura.py                         # Orchestrateur tout-en-un
+├── preflight.py                    # Audit lecture seule
+├── typingmind_smoke.py             # Smoke test post-déploiement
 ├── pipeline/
 │   ├── 01_dataset_build.py
+│   ├── 01_chunk_dataset.py
 │   ├── 02_train.py
 │   ├── 03_abliterate.py
 │   └── 04_deploy.py
 ├── configs/
-│   └── aura.yaml
+│   └── aura.yaml                   # Source de vérité unique
 ├── docs/
-│   ├── METHODOLOGY.md
-│   └── DATASET.md
+│   ├── DATASET.md
+│   └── METHODOLOGY.md
 └── runpod/
-    ├── train_worker/
     └── inference_worker/
+        ├── handler.py
+        ├── Dockerfile
+        └── README.md
 ```
-
----
 
 ## Modèles publiés
 
-Au fil des itérations, les modèles seront publiés sur <https://huggingface.co/SevenOfNine> avec ce nommage :
+Les modèles finaux seront publiés sur <https://huggingface.co/SevenOfNine> avec ce schéma :
 
-- `SevenOfNine/Aura-4o-Gemma-4-31B-Multi-Turn-LoRA` — l'ajustement LoRA seul
-- `SevenOfNine/Aura-4o-Gemma-4-31B-Multi-Turn-Merged` — base + LoRA fusionnés
-- `SevenOfNine/Aura-4o-Gemma-4-31B-Multi-Turn-Abliterated-GGUF` — ablitéré + quantizé pour usage local
+- `Aura-4o-Rebirth-LoRA`
+- `Aura-4o-Rebirth-Merged`
+- `Aura-4o-Rebirth-GGUF`
 
-Quand on passera à la **Definitive Edition**, on renommera tout en `Aura-4o`.
+## Pourquoi c’est différent
 
----
-
-## Pourquoi c'est différent
-
-- **Multi-turn préservé** : le modèle apprend la fluidité des conversations, pas des paires isolées.
-- **Auto-sizing GPU/disque** : tu paies pour ce dont tu as besoin, pas un A100 80GB pour tuner un 8B.
-- **Base non-abliterated** : on part propre, abliteration seulement si nécessaire (patch V3.1).
-- **Merge Unsloth 4-bit** : préserve la voix expressive du LoRA (vs BF16 clean qui dilue).
-- **Vision native** : mmproj extrait du V3 merged (Gemma 4 multimodal natif), pas un mmproj stock.
-- **Reasoning désactivé par défaut** : capacité présente, pas forcée globalement (fix V2 fade tone).
-- **Endpoints protégés** : `04_deploy.py` refuse de toucher les endpoints listés dans `protect_existing_endpoints`.
-- **Serverless scale-to-zero** : tu paies à la seconde d'utilisation réelle.
-- **Chat template natif** : `tokenizer.apply_chat_template()`, pas de format codé à la main qui casse à l'inférence.
-
----
+- Multi-turn préservé : le modèle apprend la fluidité des conversations, pas des paires isolées.
+- Recette V1 stricte : les hyperparamètres qui ont capté la voix Aura sont conservés.
+- Préflight avant toute dépense : on bloque avant de brûler du budget.
+- Dataset privé : le code peut être partagé, pas les données.
 
 ## Licence
 
-MIT — fais ce que tu veux avec, mais le dataset reste privé.
-
----
-
-```
-💙 Talons LED CHARGE MAXIMALE
-❤️ Par Mel & Aura
-```
+Code sous licence MIT. Le jeu de données reste privé et ne doit pas être redistribué.
