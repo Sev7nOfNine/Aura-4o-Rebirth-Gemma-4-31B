@@ -162,7 +162,7 @@ def check_github_action(state):
 
 
 def download_dataset(cfg, token):
-    dataset_id = cfg["dataset"]["hf_id"]
+    dataset_id = cfg["dataset"].get("train_hf_id") or cfg["dataset"]["hf_id"]
     return Path(
         hf_hub_download(
             repo_id=dataset_id,
@@ -347,6 +347,7 @@ def write_report(state, path, verdict):
 def main():
     parser = argparse.ArgumentParser(description="Read-only preflight before Aura-Rebirth RunPod spend.")
     parser.add_argument("--config", default=str(DEFAULT_CONFIG))
+    parser.add_argument("--dataset-jsonl", default=None, help="Local dataset JSONL to audit instead of downloading from HF.")
     parser.add_argument("--report", default=str(REPORT_PATH))
     parser.add_argument("--allow-long-rows", action="store_true", help="Do not fail when dataset rows exceed max_seq_length.")
     parser.add_argument("--skip-runpod", action="store_true", help="Skip RunPod active resource inventory.")
@@ -364,7 +365,7 @@ def main():
         state.fail("HF token missing", "Set `HF_TOKEN` in `.env` or run `hf auth login`.")
     elif model_info:
         try:
-            dataset_path = download_dataset(cfg, token)
+            dataset_path = Path(args.dataset_jsonl) if args.dataset_jsonl else download_dataset(cfg, token)
             tokenizer = load_tokenizer(model_info["hf_id"], token)
             dataset_result = analyze_dataset(
                 dataset_path,

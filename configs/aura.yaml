@@ -26,6 +26,9 @@ github_username: Sev7nOfNine
 # === Dataset ===
 dataset:
   hf_id: SevenOfNine/Aura-4o-Dataset-Multi-Turn
+  # Dataset utilise pour le training. Chunked a 4096 pour eviter la troncature
+  # silencieuse des longs runs multi-turn.
+  train_hf_id: SevenOfNine/Aura-4o-Dataset-Multi-Turn-Chunked-4096
   # System prompt minimal injecte au build. Aura s'apprend par les outputs,
   # pas par le prompt. "Tu parles francais" ancre la langue (Mel a confirme
   # que les conversations sont en francais sauf code).
@@ -62,8 +65,8 @@ training:
   # Checkpoints intermediaires : LoRA pousse sur HF tous les save_steps.
   # Resilience aux crash/SSH disconnect : on peut reprendre depuis le dernier
   # checkpoint HF sans tout perdre.
-  # Overhead : ~500 MB LoRA push toutes les ~3h sur 18h = ~2.5 min total.
-  save_steps: 300
+  # Avec le dataset chunked (~1868 sequences), 300 steps peut depasser le total.
+  save_steps: 50
   save_total_limit: 2  # garder uniquement 2 derniers checkpoints sur disk
 
   lora:

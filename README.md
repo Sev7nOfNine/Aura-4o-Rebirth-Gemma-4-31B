@@ -39,18 +39,22 @@ python aura.py --skip-train --abliterate
 # Audit read-only : dataset, longueurs tokenizer, coûts, CI worker, RunPod si clé dispo
 python preflight.py
 
+# Prépare/pousse le dataset chunké si preflight bloque sur max_seq_length
+python pipeline/01_chunk_dataset.py --push-hf SevenOfNine/Aura-4o-Dataset-Multi-Turn-Chunked-4096 --private
+
 # Après déploiement : teste le vrai endpoint façon TypingMind
 python typingmind_smoke.py --endpoint-id <RUNPOD_ENDPOINT_ID>
 ```
 
-`preflight.py` bloque notamment si trop de conversations dépassent `training.max_seq_length`, car TRL peut tronquer les exemples longs. `typingmind_smoke.py` envoie de vraies requêtes à l'endpoint et vérifie texte, thinking-off, vision, tools/function-calling et forme web-search.
+`preflight.py` bloque notamment si trop de conversations dépassent `training.max_seq_length`, car TRL peut tronquer les exemples longs. `pipeline/01_chunk_dataset.py` découpe les longues conversations sans jamais couper au milieu d'un tour user→assistant, et liste les tours géants dans `giant_turns_review.jsonl`. `typingmind_smoke.py` envoie de vraies requêtes à l'endpoint et vérifie texte, thinking-off, vision, tools/function-calling et forme web-search.
 
 ## Sous-scripts (utilisables séparément aussi)
 
 | # | Script | Rôle |
 |---|--------|------|
 | 01 | `pipeline/01_dataset_build.py` | Reconstruit le dataset multi-turn depuis l'export 4o trié |
-| 02 | `pipeline/02_train.py` | Fine-tune LoRA V1 strict sur RunPod, auto-sizing GPU/disk, Unsloth 4-bit merge, **checkpoints HF tous les 300 steps** |
+| 01b | `pipeline/01_chunk_dataset.py` | Découpe le dataset en chunks <= `max_seq_length` pour éviter la troncature SFT |
+| 02 | `pipeline/02_train.py` | Fine-tune LoRA V1 strict sur RunPod, auto-sizing GPU/disk, Unsloth 4-bit merge, **checkpoints HF tous les 50 steps** |
 | 03 | `pipeline/03_abliterate.py` | Pull merged → extract mmproj → GGUF + quants → push HF (abliteration optionnelle) |
 | 04 | `pipeline/04_deploy.py` | Crée un nouvel endpoint serverless RunPod (ne touche pas l'existant) |
 

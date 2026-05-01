@@ -2,7 +2,8 @@ __pycache__/
 *.pyc
 .env
 *.log
-preflight_report*.md
+preflight*.md
+chunk_report*.md
 
 # Datasets et modeles : trop lourds pour git, deja sur HF
 *.jsonl

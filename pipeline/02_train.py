@@ -241,7 +241,8 @@ def main():
 
     print(f'📋 Plan')
     print(f'   Base model    : {model_key} ({model_info["hf_id"]})')
-    print(f'   Dataset       : {cfg["dataset"]["hf_id"]}')
+    dataset_hf_id = cfg["dataset"].get("train_hf_id") or cfg["dataset"]["hf_id"]
+    print(f'   Dataset       : {dataset_hf_id}')
     print(f'   System prompt : {cfg["dataset"]["system_prompt"]!r}')
     print(f'   LoRA          : r={cfg["training"]["lora"]["r"]}, alpha={cfg["training"]["lora"]["alpha"]}, dropout={cfg["training"]["lora"]["dropout"]}')
     print(f'   LR / epochs   : {cfg["training"]["learning_rate"]} / {cfg["training"]["num_train_epochs"]}')
@@ -385,7 +386,7 @@ def main():
     train_script = generate_training_script(
         cfg,
         model_info,
-        cfg['dataset']['hf_id'],
+        dataset_hf_id,
         args.hf_token,
         cfg['output']['lora_repo'],
         cfg['output']['merged_repo'],
