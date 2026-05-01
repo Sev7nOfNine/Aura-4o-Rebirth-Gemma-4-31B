@@ -136,6 +136,69 @@ Copier le pattern de bash bootstrap auto-delete utilise dans
 
 ---
 
+## 4. `pip install --upgrade transformers` casse l'import unsloth
+
+### Symptome
+
+Au deuxieme lancement de `pipeline/02_train.py`, le pod a boote, le bootstrap
+a tourne, l'install des deps s'est deroule, puis le training a fait
+silencieusement quelques secondes et le bash trap a fait son boulot
+(auto-delete du pod). Cote console RunPod : `Pod data is no longer available`.
+
+Le log local s'arretait sur :
+```
+[bootstrap] Starting training script
+```
+sans STEP suivant ni Traceback (probablement perdu dans le chevauchement
+entre le crash python et la fermeture SSH).
+
+Le coupable se voyait quelques lignes au-dessus :
+```
+ERROR: pip's dependency resolver does not currently take into account...
+unsloth-zoo 2026.4.9 requires transformers ... <=5.5.0,
+but you have transformers 5.7.0 which is incompatible.
+```
+
+### Cause racine
+
+L'install_cmds dans `pipeline/02_train.py` finissait par
+`pip install --upgrade transformers` qui forcait la version la plus
+recente (5.7.0). Or `unsloth-zoo` exige `transformers <=5.5.0`. Donc
+`from unsloth import FastModel` levait une exception au demarrage de
+`train.py`, code de sortie ≠ 0, le bash trap appelait `delete_pod`,
+fin du pod.
+
+C'est en fait le bash trap qui a bien fait son boulot. Le bug n'est pas
+dans le trap, il est dans la liste d'install.
+
+### Fix
+
+Pinner `transformers` a une version compatible avec unsloth-zoo plutot
+que de forcer la derniere :
+
+```python
+'pip install "transformers>=4.56.0,<=5.5.0,!=4.57.4,!=4.57.5,!=5.0.0,!=5.1.0"',
+```
+
+### Fichiers touches
+
+- `pipeline/02_train.py` (install_cmds, derniere ligne)
+
+Penser a verifier la meme chose dans `scripts/hf_jobs/train_aura_rebirth.py`
+qui declare `transformers>=4.56.0` sans plafond — peut casser pareillement
+si une version >5.5.0 sort entre temps. **A pinner aussi quand on a le temps.**
+
+### Date
+
+2026-05-01.
+
+### Cout incident
+
+~$0,15 (20-30 min sur A40 EU-SE-1, pod auto-detruit par le bash trap
+sans intervention manuelle requise).
+
+---
+
 ## 3. HF storage trop petit en private → repos de sortie en public
 
 ### Symptome

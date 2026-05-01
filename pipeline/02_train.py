@@ -478,7 +478,11 @@ def main():
         'pip install "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git" --force-reinstall --no-deps',
         'pip install --upgrade unsloth_zoo --no-deps',
         'pip install xformers trl peft accelerate bitsandbytes datasets huggingface_hub hf_transfer',
-        'pip install --upgrade transformers',
+        # Pin transformers a une version compatible avec unsloth-zoo
+        # (unsloth-zoo 2026.4.x requiert transformers >=4.51.3, <=5.5.0,
+        #  avec exclusions). `pip install --upgrade transformers` poussait
+        #  vers 5.7.0 et cassait `from unsloth import FastModel`.
+        'pip install "transformers>=4.56.0,<=5.5.0,!=4.57.4,!=4.57.5,!=5.0.0,!=5.1.0"',
     ]
     train_script = generate_training_script(
         cfg,
