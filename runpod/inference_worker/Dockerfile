@@ -11,6 +11,8 @@ FROM ghcr.io/ggml-org/llama.cpp:server-cuda
 
 WORKDIR /app
 
+# PEP 668 compat : Debian/Ubuntu recents marquent leur Python comme externally-managed,
+# pip refuse d'installer dans le system Python par defaut. On force ici (image jetable).
 ENV DEBIAN_FRONTEND=noninteractive \
     PIP_BREAK_SYSTEM_PACKAGES=1
 
