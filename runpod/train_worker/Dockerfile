@@ -53,9 +53,15 @@ RUN pip install --no-cache-dir hf_transfer
 RUN pip install --no-cache-dir \
         "transformers>=4.56.0,<=5.5.0,!=4.57.4,!=4.57.5,!=5.0.0,!=5.1.0"
 
-# Sanity check : Unsloth importe sans erreur (echec ici = build qui foire,
-# pas un crash silencieux a runtime)
-RUN python -c "from unsloth import FastModel; print('[build-check] Unsloth OK')"
+# Sanity check : tous les packages critiques sont presents.
+# On ne fait PAS `from unsloth import FastModel` car Unsloth refuse de
+# s'importer sans GPU (NotImplementedError "no torch accelerator"). Or
+# les runners GitHub Actions n'ont pas de GPU - mais le pod RunPod si.
+# Donc on verifie juste que les packages sont installes (find_spec).
+RUN python -c "import importlib.util; \
+import sys; \
+missing = [p for p in ['unsloth', 'unsloth_zoo', 'transformers', 'trl', 'peft', 'bitsandbytes', 'datasets', 'huggingface_hub', 'hf_transfer', 'xformers', 'accelerate'] if not importlib.util.find_spec(p)]; \
+sys.exit(f'[build-check] FAIL : packages manquants {missing}') if missing else print('[build-check] Tous les packages installes (verifie a runtime sur GPU)')"
 
 # Copie des scripts du worker
 COPY train.py /app/train.py
