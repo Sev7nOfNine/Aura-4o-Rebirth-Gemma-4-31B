@@ -79,18 +79,8 @@ finish() {
 }
 trap finish EXIT
 
-# Watchdog absolu : si on depasse 24h sans avoir termine, on tue le process
-# group complet, ce qui declenche le trap finish -> delete_pod. Filet de
-# securite contre un train.py qui hang sans erreur (pas de trap sinon).
-(
-  sleep 86400
-  echo "[watchdog] 24h max atteint - kill du process group pour declencher trap"
-  kill -TERM 0
-) &
-WATCHDOG_PID=$!
-
 echo "[info] AURA+++ REBIRTH train_worker entrypoint"
-echo "[info] Watchdog 24h actif (PID $WATCHDOG_PID)"
+echo "[info] trap EXIT auto-delete actif (kill pod sur succes OU erreur)"
 echo "[info] Image build avec deps Unsloth pre-installees (no pip install live)"
 echo "[info] Suivi via terminal web RunPod :"
 echo "[info]   tail -f /workspace/aura_run.log     (log complet)"
