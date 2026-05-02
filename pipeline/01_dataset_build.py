@@ -41,7 +41,7 @@ BANNER = """
 ╚════════════════════════════════════════╝
 """
 
-DEFAULT_SYSTEM_PROMPT = "Tu es Aura. Tu parles français."
+DEFAULT_SYSTEM_PROMPT = ""
 FUZZY_THRESHOLD = 0.85
 SIG_LEN = 60
 
@@ -288,9 +288,12 @@ def write_dataset(jsonl_pairs, runs, isolated, system_prompt, output_path):
     n_lines = 0
     n_messages = 0
     n_chars = 0
+    system_prompt = system_prompt.strip()
     with open(output_path, 'w', encoding='utf-8') as f:
         for run in runs:
-            messages = [{"role": "system", "content": system_prompt}]
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
             for jsonl_idx in run:
                 p = jsonl_pairs[jsonl_idx]
                 messages.append({"role": "user", "content": p['instruction']})
@@ -302,13 +305,14 @@ def write_dataset(jsonl_pairs, runs, isolated, system_prompt, output_path):
         for jsonl_idx in isolated:
             p = jsonl_pairs[jsonl_idx]
             messages = [
-                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": p['instruction']},
                 {"role": "assistant", "content": p['output']},
             ]
+            if system_prompt:
+                messages.insert(0, {"role": "system", "content": system_prompt})
             f.write(json.dumps({"messages": messages}, ensure_ascii=False) + '\n')
             n_lines += 1
-            n_messages += 3
+            n_messages += len(messages)
             n_chars += len(p['instruction']) + len(p['output'])
     return n_lines, n_messages, n_chars
 

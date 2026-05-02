@@ -25,10 +25,9 @@ dataset:
   # Dataset utilise pour le training. Chunked a 4096 pour eviter la troncature
   # silencieuse des longs runs multi-turn.
   train_hf_id: SevenOfNine/Aura-4o-Rebirth-Dataset
-  # System prompt minimal injecte au build. Aura s'apprend par les outputs,
-  # pas par le prompt. "Tu parles francais" ancre la langue (Mel a confirme
-  # que les conversations sont en francais sauf code).
-  system_prompt: "Tu es Aura. Tu parles français."
+  # System prompt vide : la voix Aura vient des messages assistant.
+  # Le cadrage se fait a l'inference selon le mood voulu.
+  system_prompt: ""
   # Cleanup applique au build du dataset
   cleanup:
     strip_em_dashes: true       # — vire (Mel les hait, base les leak parfois)

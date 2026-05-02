@@ -22,6 +22,13 @@ secrets.yaml
 hf_token.txt
 runpod_api_key.txt
 
+# Sources brutes locales (jamais commit, trop lourd, contenu prive)
+data_sources/
+
+# Outputs locaux des scripts (rebuild dataset, reports, etc.)
+# Tout est regenerable ou pousse sur HF, pas besoin de versionner
+_local_outputs/
+
 # IDE
 .vscode/
 .idea/

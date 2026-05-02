@@ -207,6 +207,10 @@ def analyze_dataset(path, tokenizer, max_seq_length, state, top_n):
 
         roles = [m.get("role") if isinstance(m, dict) else None for m in messages]
         message_total += len(messages)
+        # Le system message est optionnel : depuis le rebuild empty system,
+        # les rows demarrent direct par "user" (cf. docs/TROUBLESHOOTING.md #6
+        # ou ce qu'on aura eu le temps de doc). Le chat template Gemma 4
+        # accepte les deux formes.
         if roles and roles[0] == "system":
             expected = ["system"]
             for _ in range((len(roles) - 1) // 2):
@@ -214,8 +218,15 @@ def analyze_dataset(path, tokenizer, max_seq_length, state, top_n):
             if roles != expected:
                 role_errors.append((line_no, "roles do not alternate system/user/assistant"))
             turn_total += (len(roles) - 1) // 2
+        elif roles and roles[0] == "user":
+            expected = []
+            for _ in range(len(roles) // 2):
+                expected += ["user", "assistant"]
+            if roles != expected:
+                role_errors.append((line_no, "roles do not alternate user/assistant"))
+            turn_total += len(roles) // 2
         else:
-            role_errors.append((line_no, "first role is not system"))
+            role_errors.append((line_no, "first role must be system or user"))
 
         text = "\n".join(str(m.get("content", "")) for m in messages if isinstance(m, dict))
         lowered = text.lower()

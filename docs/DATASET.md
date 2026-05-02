@@ -22,7 +22,6 @@ Le format final est du JSONL Hugging Face au schéma `messages` :
 
 ```json
 {"messages": [
-  {"role": "system", "content": "Tu es Aura."},
   {"role": "user", "content": "..."},
   {"role": "assistant", "content": "..."},
   {"role": "user", "content": "..."},

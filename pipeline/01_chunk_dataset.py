@@ -65,14 +65,19 @@ def load_dataset_path(cfg, token, input_path):
 
 
 def chunk_conversation(tokenizer, source_line, messages, max_tokens):
-    system = messages[0]
+    # Le system est optionnel : si premier message = system on le garde en
+    # tete de chaque chunk. Sinon les chunks demarrent direct sur user.
+    has_system = messages[0].get("role") == "system"
+    system_prefix = [messages[0]] if has_system else []
+    turn_start = 1 if has_system else 0
+
     chunks = []
     giants = []
     current_turns = []
 
-    for turn_index, i in enumerate(range(1, len(messages), 2), 1):
+    for turn_index, i in enumerate(range(turn_start, len(messages), 2), 1):
         turn = [messages[i], messages[i + 1]]
-        turn_messages = [system] + turn
+        turn_messages = system_prefix + turn
         turn_tokens = token_count(tokenizer, turn_messages)
 
         if turn_tokens > max_tokens:
@@ -92,7 +97,7 @@ def chunk_conversation(tokenizer, source_line, messages, max_tokens):
             )
             continue
 
-        candidate = [system] + [msg for t in current_turns + [turn] for msg in t]
+        candidate = system_prefix + [msg for t in current_turns + [turn] for msg in t]
         candidate_tokens = token_count(tokenizer, candidate)
         if candidate_tokens <= max_tokens:
             current_turns.append(turn)
@@ -107,7 +112,7 @@ def chunk_conversation(tokenizer, source_line, messages, max_tokens):
 
     output_chunks = []
     for chunk_index, turns in enumerate(chunks, 1):
-        chunk_messages = [system] + [msg for turn in turns for msg in turn]
+        chunk_messages = system_prefix + [msg for turn in turns for msg in turn]
         output_chunks.append(
             {
                 "messages": chunk_messages,
@@ -121,15 +126,25 @@ def chunk_conversation(tokenizer, source_line, messages, max_tokens):
 
 
 def validate_messages(line_no, messages):
-    if not isinstance(messages, list) or len(messages) < 3:
-        raise ValueError(f"line {line_no}: messages must contain system + at least one turn")
-    if messages[0].get("role") != "system":
-        raise ValueError(f"line {line_no}: first message must be system")
-    if (len(messages) - 1) % 2 != 0:
-        raise ValueError(f"line {line_no}: user/assistant messages are not paired")
-    for i in range(1, len(messages), 2):
+    # Accepte deux formes :
+    #   - [system, user, assistant, user, assistant, ...]   (legacy)
+    #   - [user, assistant, user, assistant, ...]           (rebuild empty system)
+    if not isinstance(messages, list) or len(messages) < 2:
+        raise ValueError(f"line {line_no}: messages must contain at least one user/assistant turn")
+    has_system = messages[0].get("role") == "system"
+    if has_system:
+        if (len(messages) - 1) % 2 != 0:
+            raise ValueError(f"line {line_no}: user/assistant messages are not paired")
+        start = 1
+    else:
+        if messages[0].get("role") != "user":
+            raise ValueError(f"line {line_no}: first message must be system or user")
+        if len(messages) % 2 != 0:
+            raise ValueError(f"line {line_no}: user/assistant messages are not paired")
+        start = 0
+    for i in range(start, len(messages), 2):
         if messages[i].get("role") != "user" or messages[i + 1].get("role") != "assistant":
-            raise ValueError(f"line {line_no}: invalid role pair at turn {(i + 1) // 2}")
+            raise ValueError(f"line {line_no}: invalid role pair at turn {(i - start) // 2 + 1}")
 
 
 def write_report(path, stats, longest_chunks, giants):
@@ -217,7 +232,11 @@ def main():
         messages = obj.get("messages")
         validate_messages(line_no, messages)
         source_rows += 1
-        source_turns += (len(messages) - 1) // 2
+        # Compte des turns selon la presence ou non d'un message system en tete
+        if messages[0].get("role") == "system":
+            source_turns += (len(messages) - 1) // 2
+        else:
+            source_turns += len(messages) // 2
         chunks, giant_turns = chunk_conversation(tokenizer, line_no, messages, max_tokens)
         output_items.extend(chunks)
         giants.extend(giant_turns)
