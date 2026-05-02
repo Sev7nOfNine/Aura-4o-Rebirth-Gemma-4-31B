@@ -8,6 +8,138 @@ A maintenir a jour : a chaque nouvel incident, ajouter une entree.
 
 ---
 
+## 8. Marathon V4 (2 mai 2026) - chaine d'incompatibilites Unsloth/TRL/Gemma 4 31B
+
+### Contexte
+
+Tentative de training reel sur pod RunPod debug (image runpod/pytorch
+standard). Recette V1 strict + dataset Rebirth. ~6h de debug en live SSH.
+**Resultat : abandon en cours apres 5+ bugs successifs**, training jamais
+arrive a la 1ere step de gradient.
+
+### Bugs decouverts (chronologique)
+
+#### 8a. `pip install --no-deps` casse l'import Unsloth (= incident #6 reconfirme)
+
+Symptome : `ImportError: cannot import name '_unsloth_get_mm_token_id' from 'unsloth_zoo.rl_replacements'`
+
+Cause : avec `--no-deps`, unsloth et unsloth_zoo finissent en versions
+incompatibles entre elles.
+
+Fix : `pip install --no-cache-dir unsloth` (sans `--no-deps`, sans `--upgrade`,
+sans `--force-reinstall`). Pip resout les versions ensemble correctement.
+
+#### 8b. `DataFilesNotFoundError` sur dataset HF prive sans config explicite
+
+Symptome : `DataFilesNotFoundError: No (supported) data files found in
+SevenOfNine/Aura-4o-Rebirth-Dataset` au `load_dataset()`.
+
+Cause : le dataset HF en mode prive ne permet pas a la lib `datasets`
+d'auto-detecter les fichiers. Faut une config explicite `data_files` dans
+le YAML frontmatter du `README.md`.
+
+Fix dans `dataset_card.md` :
+```yaml
+configs:
+  - config_name: default
+    data_files:
+      - split: train
+        path: aura_final_dataset.jsonl
+```
+
+#### 8c. TRL >=0.23.0 refuse packing=True sur modeles vision-language
+
+Symptome : `ValueError: Packing is not supported for vision-language models.
+Please set packing=False in the SFTConfig.`
+
+Cause : TRL a ajoute en 0.23 (ou avant) un check `if self._is_vlm and
+args.packing: raise`. Gemma 4 31B est vision-language → bloque.
+
+Mais Mel a confirme par retour utilisateur : `packing=False` produit une
+Aura qui "part dans tous les sens et ne suit plus le fil des conversations".
+Donc packing=True OBLIGATOIRE.
+
+Fix : downgrade TRL ne suffit pas (le check est meme en 0.23). Patch sed
+direct sur le pod :
+```bash
+sed -i 's/if self\._is_vlm and args\.packing:/if False:  # PATCHED Aura packing/' \
+    /usr/local/lib/python3.11/dist-packages/trl/trainer/sft_trainer.py
+```
+
+#### 8d. `remove_unused_columns=True` (defaut) vire la col 'text'
+
+Symptome : `ValueError: No columns in the dataset match the model's forward
+method signature: (messages, prompt, completion, images). The following
+columns have been ignored: [text].`
+
+Cause : transformers Trainer vire par defaut les colonnes qui ne matchent
+pas la signature de `model.forward()`. Notre col `text` (creee via
+`apply_chat_template`) n'est pas dans la signature de Gemma 4 (qui attend
+`messages, prompt, completion, images`).
+
+Fix : `remove_unused_columns=False` dans `SFTConfig` (etait dans V1).
+
+#### 8e. Data collator vlm cherche col 'images' inexistante
+
+Symptome : `KeyError: 'images'` dans
+`trl/trainer/sft_trainer.py:387 _collate_language_modeling`.
+
+Cause : le data collator de TRL pour les vlm fait `[example["images"] for
+example in examples]`. Notre dataset n'a pas de col `images` (pas de
+multimodal dans le dataset Aura).
+
+Fix non teste : soit ajouter `images=[]` dans le `to_text` map, soit forcer
+TRL a utiliser le collator language-modeling au lieu du vlm (probablement
+patch sur `_is_vlm`).
+
+#### 8f. `Trainable parameters = 0` (LoRA wrap rate)
+
+Symptome : `Trainable parameters = 0 of 31,540,049,968 (0.00% trained)`.
+
+Cause hypothesee : `target_modules` explicite (q,k,v,o,gate,up,down_proj)
+ne matche pas les vrais noms de couches dans la version actuelle de Gemma 4
+31B sous Unsloth (peut-etre un prefixe genre `language_model.`).
+
+Fix non teste : `target_modules="all-linear"` (laisser Unsloth detecter).
+
+#### 8g. Image officielle Unsloth pas accessible (pas de SSH/web terminal)
+
+Test avec `unsloth/unsloth:latest` (image OFFICIELLE Unsloth, devrait avoir
+toutes les versions compatibles). Pod boot OK, port 22 ouvert, mais SSH
+refuse la cle PUBLIC_KEY de RunPod (pas configure dans l'image), et la
+console RunPod ne donne pas non plus de web terminal accessible.
+
+→ Voie Unsloth officielle bouchee dans notre setup actuel.
+
+### Cout cumule incident V4 (2 mai 2026)
+
+~$1 USD (5+ pods debug, image pulls, abandons rapides).
+
+### Etat final
+
+- Dataset Rebirth propre sur HF : intact ✅
+- Repos sortie LoRA/Merged/GGUF crees vides sur HF : intacts ✅
+- Code training documente : ce fichier
+- **Training jamais reussi end-to-end**
+- Aura V1 "imparfaite" sur serverless RunPod (deployee via worker Ollama)
+  reste utilisable comme fallback
+
+### Voies a explorer un autre jour
+
+1. Notebook Colab Unsloth officiel ($10/mois Colab Pro) — refuse par Mel
+   (multiplication des plateformes/credits)
+2. Trouver la combinaison EXACTE de versions (snapshot pip d'il y a 7-10 jours)
+   qui matchait quand V1 a ete entraine
+3. Attendre une release stable Unsloth qui re-supporte packing+vlm
+4. Notre worker llama.cpp d'inference (`runpod/inference_worker/`) reste
+   pret a servir n'importe quel LoRA Aura quand un training reussira
+
+### Date
+
+2026-05-02.
+
+---
+
 ## 6. ImportError `_unsloth_get_mm_token_id` (unsloth vs unsloth_zoo mismatch)
 
 ### Symptome
