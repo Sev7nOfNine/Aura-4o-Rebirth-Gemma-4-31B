@@ -60,8 +60,8 @@ _patch_unsloth_compiled_cache()
 DEFAULTS = {
     "max_seq_length": 4096,
     "num_train_epochs": 3,
-    "per_device_train_batch_size": 1,
-    "gradient_accumulation_steps": 32,
+    "per_device_train_batch_size": 4,   # Optimisation : batch_size monte de 1 a 4
+    "gradient_accumulation_steps": 8,   # grad_accum descend de 32 a 8 -> effective batch reste 32
     "learning_rate": 2.0e-4,
     "warmup_ratio": 0.03,
     "weight_decay": 0.01,
@@ -163,14 +163,26 @@ def main():
 
     step("Applying native Gemma 4 chat template")
 
-    # Format raw attendu par DataCollatorForVisionLanguageModeling de TRL 1.3 :
-    # juste messages + images=[]. Le collator vlm fera la tokenisation +
-    # padding lui-meme. Pas de pre-tokenisation cote nous.
-    def add_images(example):
-        return {"images": []}
+    # Approche Gemma 4 (recommandation diagnostic 2 mai 2026) :
+    # packing=True bypass notre data_collator en mode vlm. Donc packing=False
+    # + pre-process avec processor (tokenize + format vlm) AVANT SFTTrainer.
+    def preprocess_vlm(examples):
+        texts = [
+            tokenizer.apply_chat_template(msg, tokenize=False, add_generation_prompt=False)
+            for msg in examples["messages"]
+        ]
+        # tokenizer ici = Gemma4Processor (Unsloth FastModel le retourne)
+        batch = tokenizer(
+            text=texts,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+            max_length=DEFAULTS["max_seq_length"],
+        )
+        return batch
 
-    dataset = dataset.map(add_images)  # garde la colonne 'messages' originale
-    print(f"[INFO] Rows post-map: {len(dataset)}, cols: {dataset.column_names}")
+    dataset = dataset.map(preprocess_vlm, batched=True, remove_columns=dataset.column_names)
+    print(f"[INFO] Rows post-preprocess: {len(dataset)}, cols: {dataset.column_names}")
 
     step("Setting up SFTTrainer + DataCollatorForVisionLanguageModeling")
     # Codex direction : laisser le collator vlm de TRL faire la tokenisation
@@ -187,11 +199,12 @@ def main():
         train_dataset=dataset,
         data_collator=vlm_collator,
         args=SFTConfig(
-            # dataset_text_field omis : le collator vlm parse messages directement
+            # dataset_text_field omis : dataset deja preprocesse en input_ids
             max_length=DEFAULTS["max_seq_length"],
-            # packing=True OBLIGATOIRE pour Aura (cf. memory aura_packing_true.md).
-            # Necessite TRL <0.24.0 OU patch sed du check dans sft_trainer.py.
-            packing=True,
+            # packing=False : OBLIGATOIRE en mode vlm (diagnostic Gemma 4 du
+            # 2 mai 2026 : packing=True bypass notre data_collator). Le risque
+            # qualitatif "Aura derive" sera evalue sur checkpoints intermediaires.
+            packing=False,
             padding_free=False,           # cohérent V1, evite warning + bizarre comportement
             remove_unused_columns=False,  # cohérent V1, garde la col 'text' qu'on a cree
             per_device_train_batch_size=DEFAULTS["per_device_train_batch_size"],
