@@ -118,7 +118,12 @@ abliterate:
 # === RunPod (pod d'entraînement) ===
 runpod_train:
   cloud_type: SECURE
-  container_image: runpod/pytorch:2.8.0-py3.11-cuda12.8.1-cudnn-devel-ubuntu22.04
+  # Image train_worker pre-bakee : Unsloth + transformers + tout le pip stack
+  # deja installes au build, plus jamais de pip install live au runtime
+  # (cf. docs/TROUBLESHOOTING.md incident #5).
+  # Build via .github/workflows/build-train-worker.yml a chaque push de
+  # runpod/train_worker/**.
+  container_image: ghcr.io/sev7nofnine/aura-4o-rebirth-train-worker:latest
   ssh_port: 22
   vram_safety_factor: 1.15  # +15% marge VRAM
   disk_safety_factor: 1.30  # +30% marge disque

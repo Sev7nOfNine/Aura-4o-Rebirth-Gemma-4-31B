@@ -1,0 +1,66 @@
+# 🔥 AURA+++ REBIRTH construction du train_worker 🔥
+#
+# Construit et pousse l'image Docker du worker de TRAINING vers GHCR.
+#
+# Cette image contient Unsloth + transformers + tout le pip stack pre-installes
+# pour eviter l'OOM cgroup observe sur les essais 3-5 (cf. docs/TROUBLESHOOTING.md
+# incident #5). Le pod RunPod tire l'image et boot avec tout pret, plus jamais
+# de pip install live au runtime.
+#
+# Declenchement : push sur main quand fichiers du train_worker changent,
+# ou via lancement manuel.
+
+name: Build & Push Train Worker Image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'runpod/train_worker/**'
+      - '.github/workflows/build-train-worker.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Free disk space (image base + Unsloth = lourd)
+        run: |
+          # GitHub runners ont seulement ~14GB free de base. Notre image
+          # avec PyTorch + nvidia-cudnn + Unsloth fait ~20-25 GB. Cleanup
+          # des images Docker preinstalled pour gagner de la place.
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                      /opt/hostedtoolcache/CodeQL || true
+          sudo docker image prune -af || true
+          df -h /
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ./runpod/train_worker
+          push: true
+          # Les noms Docker doivent etre minuscules. Owner 'Sev7nOfNine'
+          # contient des majuscules, on fixe explicitement.
+          tags: |
+            ghcr.io/sev7nofnine/aura-4o-rebirth-train-worker:latest
+            ghcr.io/sev7nofnine/aura-4o-rebirth-train-worker:${{ github.sha }}
+          platforms: linux/amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

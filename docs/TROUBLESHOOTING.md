@@ -233,6 +233,33 @@ a celui de l'inference qui marche depuis longtemps.
 
 Cout total cumule essais 1-5 : **~$0,50**.
 
+### Solution finale : train_worker pre-bake (2 mai 2026)
+
+`runpod/train_worker/Dockerfile` + `.github/workflows/build-train-worker.yml`
+construisent une image avec **Unsloth, transformers, peft, trl, accelerate,
+bitsandbytes, datasets, hf_transfer tous pre-installes**. Le container
+`ghcr.io/sev7nofnine/aura-4o-rebirth-train-worker:latest` boot avec tout
+deja en place.
+
+`pipeline/02_train.py` est refait : il ne fait plus que :
+1. Creer le pod RunPod avec l'image pre-bakee + env vars (HF_TOKEN, etc.)
+2. Attendre que le pod soit RUNNING
+3. Sortir
+
+Le pod boot, lance `start-train.sh` (entrypoint) qui appelle `train.py`
+puis auto-delete via trap EXIT. Plus de SSH, plus de pip install runtime,
+plus de pod fantome.
+
+### Fichiers ajoutes/modifies
+
+- `runpod/train_worker/Dockerfile` (NEW)
+- `runpod/train_worker/start-train.sh` (NEW)
+- `runpod/train_worker/train.py` (NEW)
+- `runpod/train_worker/README.md` (NEW)
+- `.github/workflows/build-train-worker.yml` (NEW)
+- `pipeline/02_train.py` (refactor complet : ~440 lignes -> ~200 lignes)
+- `configs/aura.yaml` : `container_image` pointe vers la nouvelle image GHCR
+
 ---
 
 ## 4. `pip install --upgrade transformers` casse l'import unsloth
