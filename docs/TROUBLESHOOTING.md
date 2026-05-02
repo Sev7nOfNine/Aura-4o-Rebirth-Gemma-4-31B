@@ -8,6 +8,116 @@ A maintenir a jour : a chaque nouvel incident, ajouter une entree.
 
 ---
 
+## 6. ImportError `_unsloth_get_mm_token_id` (unsloth vs unsloth_zoo mismatch)
+
+### Symptome
+
+Premier run du pod avec l'image train_worker pre-bakee. Image boot OK,
+entrypoint demarre, train.py lance, mais immediatement crash :
+
+```
+File "/usr/local/lib/python3.11/dist-packages/unsloth/models/rl_replacements.py", line 29, in <module>
+    from unsloth_zoo.rl_replacements import (
+ImportError: cannot import name '_unsloth_get_mm_token_id' from 'unsloth_zoo.rl_replacements'
+```
+
+### Cause racine
+
+Le Dockerfile heritait du script V1 et utilisait :
+
+```dockerfile
+RUN pip install unsloth
+RUN pip install "unsloth[colab-new] @ git+..." --force-reinstall --no-deps
+RUN pip install --upgrade unsloth_zoo --no-deps
+```
+
+Les `--no-deps` empechaient pip de resoudre les versions ensemble.
+Resultat : `unsloth` a une version qui attend `_unsloth_get_mm_token_id`
+mais `unsloth_zoo` est dans une version posterieure qui a renomme/supprime
+ce symbole.
+
+### Fix
+
+Virer tous les `--no-deps`. Laisser pip resoudre les versions des packages
+ensemble. Plus lent au build (re-download de torch eventuellement) mais
+seul comportement safe.
+
+```dockerfile
+RUN pip install --no-cache-dir unsloth
+# (plus de git+ ni --force-reinstall ni --no-deps)
+```
+
+### Fichiers touches
+
+- `runpod/train_worker/Dockerfile`
+
+### Date
+
+2026-05-02.
+
+---
+
+## 7. RunPod REST API DELETE renvoie 403 Forbidden (auto-delete pod casse)
+
+### Symptome
+
+Le bash trap dans `start-train.sh` essaie d'appeler
+`DELETE /v1/pods/{pod_id}` via urllib. Avec la cle RunPod regeneree, on
+recoit :
+
+```
+[cleanup] Could not delete pod pdezd64kxx4eju: HTTP Error 403: Forbidden
+```
+
+→ Pod NON supprime. Mel doit aller le tuer manuellement sur la console
+RunPod, ou continuer a payer.
+
+C'est exactement le scenario "pod fantome" qu'on voulait eviter avec le
+trap. Si Mel dort ou n'est pas dispo au moment du crash, le pod tourne
+indefiniment.
+
+### Cause racine
+
+L'endpoint REST `/v1/pods/{id}` DELETE refuse l'auth Bearer pour cette cle
+(scope, format, ou autre raison non documentee). Le SDK Python `runpod`
+qui utilise GraphQL (mutation `podTerminate`) marche avec la meme cle
+(cf. `pipeline/02_train.py` qui cree des pods sans probleme).
+
+### Fix
+
+Remplacer l'appel REST direct par le SDK Python dans `start-train.sh` :
+
+```bash
+delete_pod() {
+  python - <<'PY'
+import os, sys
+import runpod
+runpod.api_key = os.environ["RUNPOD_API_KEY"]
+runpod.terminate_pod(os.environ["RUNPOD_POD_ID"])
+PY
+}
+```
+
+Necessite `pip install runpod` dans le Dockerfile (ajoute).
+
+### Watchdog 24h
+
+En plus du trap, on ajoute un watchdog absolu : si train.py hang sans
+crash (donc trap pas declenche), apres 24h on `kill -TERM 0` sur le
+process group complet, ce qui re-declenche le trap → delete_pod.
+Belt-and-suspenders.
+
+### Fichiers touches
+
+- `runpod/train_worker/Dockerfile` (ajout `pip install runpod`)
+- `runpod/train_worker/start-train.sh` (delete via SDK + watchdog 24h)
+
+### Date
+
+2026-05-02.
+
+---
+
 ## 1. paramiko + nohup `&` = exception vide au lancement du bootstrap
 
 ### Symptome

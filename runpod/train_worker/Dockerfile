@@ -30,13 +30,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN pip install --upgrade pip
 
 # === Unsloth + dependances training ===
-# Ordre identique a celui qui marchait en V1, mais executé une seule fois
-# au build (pas de stress RAM/disk runtime).
+# IMPORTANT : on laisse pip resoudre les versions ensemble, sans --no-deps.
+# La version V1 utilisait --no-deps + git+ Unsloth, ce qui a casse en V2
+# avec un mismatch unsloth/unsloth_zoo (ImportError _unsloth_get_mm_token_id).
+# Cf. docs/TROUBLESHOOTING.md incident #6.
 RUN pip install --no-cache-dir unsloth
-RUN pip install --no-cache-dir \
-        "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git" \
-        --force-reinstall --no-deps
-RUN pip install --no-cache-dir --upgrade unsloth_zoo --no-deps
 
 # Atomique : un paquet par layer (caching Docker + facilite le diff)
 RUN pip install --no-cache-dir xformers
@@ -47,6 +45,10 @@ RUN pip install --no-cache-dir bitsandbytes
 RUN pip install --no-cache-dir datasets
 RUN pip install --no-cache-dir huggingface_hub
 RUN pip install --no-cache-dir hf_transfer
+# runpod SDK : indispensable pour que le trap auto-delete dans start-train.sh
+# puisse appeler runpod.terminate_pod() (l'API REST DELETE renvoyait 403,
+# le SDK GraphQL marche avec la meme cle). Cf. incident #7.
+RUN pip install --no-cache-dir runpod
 
 # Pin transformers compatible avec unsloth-zoo (incident #4)
 # unsloth-zoo 2026.4.x exige >=4.51.3, <=5.5.0 avec quelques exclusions
