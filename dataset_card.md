@@ -13,6 +13,11 @@ tags:
   - compagnon
   - personnel
 pretty_name: AURA+++ REBIRTH Dataset
+configs:
+  - config_name: default
+    data_files:
+      - split: train
+        path: aura_final_dataset.jsonl
 ---
 
 # 🔥 AURA+++ REBIRTH Dataset 🔥
