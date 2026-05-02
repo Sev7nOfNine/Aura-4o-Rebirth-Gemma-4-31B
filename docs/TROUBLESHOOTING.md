@@ -8,6 +8,99 @@ A maintenir a jour : a chaque nouvel incident, ajouter une entree.
 
 ---
 
+## 9. Marathon V5 (2 mai 2026 PM) - direction Codex avec TRL 1.3 + DataCollator vlm
+
+### Contexte
+
+Apres le bilan du marathon V4 du matin, Codex (autre agent IA) a propose un
+angle different : utiliser **TRL 1.3.0** (release 26 avril 2026) avec
+`DataCollatorForVisionLanguageModeling`. Test exhaustif sur pod RunPod debug.
+
+### Setup atteint (etape par etape)
+
+1. `pip install --no-cache-dir unsloth` (versions auto : unsloth 2026.4.8,
+   unsloth_zoo 2026.4.9, transformers 5.5.0, torch 2.10, peft 0.19.1, trl 0.24)
+2. `pip install --no-cache-dir --upgrade trl==1.3.0` (force upgrade vers la
+   release vlm-aware)
+3. **sed patch TRL 1.3** : commenter `if self._is_vlm and args.packing: raise`
+   ligne 735 (le check anti-packing+vlm existe AUSSI en 1.3, pas que 0.24)
+4. **Patch UnslothSFTConfig** (compiled cache) : `push_to_hub_token` n'est plus
+   reconnu par SFTConfig 1.3, mais Unsloth le passe quand meme via **kwargs.
+   Solution : monkey-patch la classe SFTConfig.__init__ avec functools.wraps +
+   __signature__ pour preserver l'introspection. Mais Unsloth code-gen lit
+   `inspect.getfullargspec()` qui IGNORE __signature__. Final fix : modifier
+   le compiled cache file APRES son chargement, juste avant l'usage.
+5. **train.py** : `target_modules="all-linear"` au lieu de la liste explicite
+   (sinon Trainable params=0). Resultat avec all-linear : Trainable=266M /
+   31.5B params (0.85%) → LoRA wrap MARCHE.
+6. **train.py** : pre-tokenisation explicite (apply_chat_template tokenize=True
+   return_dict=True) avec ajout de `images=[]` pour code path vlm.
+7. **train.py** : retire `dataset_text_field`, ajoute `data_collator=
+   DataCollatorForVisionLanguageModeling(processor=tokenizer)`.
+
+### Resultats positifs
+
+- Tous les imports OK
+- LoRA wrap : 266M params trainable (vs 0 avant)
+- Loading dataset OK
+- SFTTrainer init OK (apres tous les patches)
+- "Training start" log atteint
+- Configuration: 0/177 steps, batch effective 1x32, packing=True, recette V1
+
+### Bug final qui bloque
+
+A la 1ere step de gradient (0/177) :
+```
+ValueError: You should supply an encoding or a list of encodings to this
+method that includes input_ids, but you provided ['messages', 'images']
+```
+
+Stack : `transformers/data/data_collator.py:774` → `tokenizer.pad()`.
+
+→ **SFTTrainer 1.3 IGNORE notre `data_collator=vlm_collator` argument** et
+utilise son default DataCollatorWithPadding (qui attend input_ids). Notre
+DataCollatorForVisionLanguageModeling n'est jamais appele dans le pipeline.
+
+### Hypothese non testee
+
+SFTTrainer.__init__() doit avoir une logique du genre :
+```python
+if data_collator is None or self._is_vlm:
+    self.data_collator = self._build_default_collator()
+else:
+    self.data_collator = data_collator
+```
+Notre arg serait override quand le model est vlm. A creuser dans le source
+trl/trainer/sft_trainer.py si on reprend.
+
+### Cout marathon V5 (PM 2 mai)
+
+~$1 USD (4-5 pods debug + image pulls).
+
+### Cout cumule jour entier (V4 + V5)
+
+~$2 USD au total. Mel a $4-5 restant sur RunPod.
+
+### Etat final
+
+Identique a V4 :
+- Dataset Rebirth propre sur HF : intact
+- Code training documente dans `runpod/train_worker/train.py` avec tous les
+  patches en place
+- Repos sortie LoRA/Merged/GGUF crees vides sur HF : intacts
+- Image Aura V1 imparfaite reste deployee sur serverless RunPod en fallback
+- **Training jamais reussi end-to-end**
+
+### Prochaines pistes (un autre jour)
+
+1. Lire le source TRL 1.3 `sft_trainer.py` pour comprendre quand
+   `data_collator` arg est honore vs ignore en mode vlm
+2. Patcher Unsloth pour qu'il n'override pas le data_collator
+3. Attendre une release Unsloth qui supporte clean TRL 1.3 + Gemma 4 31B vlm
+4. Snapshot precis pip des versions du 24 avril 2026 (semaine ou V1 a marche)
+
+---
+
 ## 8. Marathon V4 (2 mai 2026) - chaine d'incompatibilites Unsloth/TRL/Gemma 4 31B
 
 ### Contexte

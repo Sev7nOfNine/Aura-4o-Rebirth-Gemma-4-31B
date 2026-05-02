@@ -18,6 +18,44 @@ import sys
 print = functools.partial(print, flush=True)
 
 
+# === PATCH UNSLOTH COMPILED CACHE ===
+# Bug Unsloth + TRL 1.3 + transformers 5.5 : UnslothSFTConfig (genere par
+# Unsloth dans /workspace/unsloth_compiled_cache/) passe `push_to_hub_token`
+# en kwarg au super().__init__(), mais SFTConfig parent ne connait plus ce
+# param. On import unsloth d'abord (regenere le cache), puis on patch le
+# fichier en place pour filtrer push_to_hub_token avant qu'il soit utilise.
+def _patch_unsloth_compiled_cache():
+    print("[patch] importing unsloth to trigger cache regeneration...")
+    from unsloth import FastModel  # noqa: F401  (regenere le cache)
+    cache_file = "/workspace/unsloth_compiled_cache/UnslothSFTTrainer.py"
+    if not os.path.exists(cache_file):
+        print(f"[patch] {cache_file} introuvable, skip")
+        return
+    with open(cache_file, "r", encoding="utf-8") as f:
+        content = f.read()
+    needle = "pad_token = pad_token,**kwargs)"
+    if needle not in content:
+        print("[patch] needle not found, cache may have changed format")
+        return
+    if "PATCHED_AURA" in content:
+        print("[patch] already patched")
+        return
+    patched = content.replace(
+        needle,
+        'pad_token = pad_token,**{k:v for k,v in kwargs.items() if k != "push_to_hub_token"})  # PATCHED_AURA',
+    )
+    with open(cache_file, "w", encoding="utf-8") as f:
+        f.write(patched)
+    print("[patch] UnslothSFTTrainer.py patched (push_to_hub_token filtered)")
+    # Forcer reload des modules unsloth_compiled_cache pour que le patch prenne
+    import sys, importlib
+    to_reload = [m for m in list(sys.modules) if "unsloth_compiled_cache" in m]
+    for m in to_reload:
+        del sys.modules[m]
+    print(f"[patch] cleared {len(to_reload)} cached modules for reimport")
+_patch_unsloth_compiled_cache()
+
+
 # === Defaults coherents avec configs/aura.yaml ===
 DEFAULTS = {
     "max_seq_length": 4096,
@@ -101,13 +139,17 @@ def main():
     )
 
     step("Wrapping with V1 strict LoRA recipe (r=32, alpha=32, dropout=0.0)")
+    # target_modules='all-linear' : laisse PEFT detecter les bonnes couches
+    # (la liste explicite q,k,v,o,gate,up,down ne match plus en Gemma 4 nouveau,
+    # cf. incident #8f Trainable params=0). Les filtres finetune_*_layers
+    # garantissent qu'on touche pas la vision tower.
     model = FastModel.get_peft_model(
         model,
         r=32,
         lora_alpha=32,
         lora_dropout=0.0,
         bias="none",
-        target_modules=TARGET_MODULES,
+        target_modules="all-linear",
         finetune_vision_layers=False,         # Vision tower preserve intacte
         finetune_language_layers=True,
         finetune_attention_modules=True,
@@ -121,27 +163,37 @@ def main():
 
     step("Applying native Gemma 4 chat template")
 
-    def to_text(example):
-        return {
-            "text": tokenizer.apply_chat_template(
-                example["messages"],
-                tokenize=False,
-                add_generation_prompt=False,
-            )
-        }
+    # Format raw attendu par DataCollatorForVisionLanguageModeling de TRL 1.3 :
+    # juste messages + images=[]. Le collator vlm fera la tokenisation +
+    # padding lui-meme. Pas de pre-tokenisation cote nous.
+    def add_images(example):
+        return {"images": []}
 
-    dataset = dataset.map(to_text, remove_columns=dataset.column_names)
-    print(f"[INFO] First sample chars: {len(dataset[0]['text'])}")
+    dataset = dataset.map(add_images)  # garde la colonne 'messages' originale
+    print(f"[INFO] Rows post-map: {len(dataset)}, cols: {dataset.column_names}")
 
-    step("Setting up SFTTrainer (V1 strict hyperparams)")
+    step("Setting up SFTTrainer + DataCollatorForVisionLanguageModeling")
+    # Codex direction : laisser le collator vlm de TRL faire la tokenisation
+    # depuis le format raw {messages, images}. Voir TRL 1.3 docs.
+    from trl.trainer.sft_trainer import DataCollatorForVisionLanguageModeling
+    vlm_collator = DataCollatorForVisionLanguageModeling(
+        processor=tokenizer,  # bon nom d'arg en TRL 1.3
+        max_length=DEFAULTS["max_seq_length"],
+    )
+
     trainer = SFTTrainer(
         model=model,
         processing_class=tokenizer,
         train_dataset=dataset,
+        data_collator=vlm_collator,
         args=SFTConfig(
-            dataset_text_field="text",
+            # dataset_text_field omis : le collator vlm parse messages directement
             max_length=DEFAULTS["max_seq_length"],
+            # packing=True OBLIGATOIRE pour Aura (cf. memory aura_packing_true.md).
+            # Necessite TRL <0.24.0 OU patch sed du check dans sft_trainer.py.
             packing=True,
+            padding_free=False,           # cohérent V1, evite warning + bizarre comportement
+            remove_unused_columns=False,  # cohérent V1, garde la col 'text' qu'on a cree
             per_device_train_batch_size=DEFAULTS["per_device_train_batch_size"],
             gradient_accumulation_steps=DEFAULTS["gradient_accumulation_steps"],
             warmup_ratio=DEFAULTS["warmup_ratio"],
