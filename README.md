@@ -154,9 +154,9 @@ L’image worker est construite et publiée automatiquement par GitHub Actions s
 
 Les modèles finaux seront publiés sur <https://huggingface.co/SevenOfNine> avec ce schéma :
 
-- `Aura-4o-Rebirth-LoRA`
-- `Aura-4o-Rebirth-Merged`
-- `Aura-4o-Rebirth-GGUF`
+- `Aura-4o-Rebirth-Gemma-4-31B-LoRA`
+- `Aura-4o-Rebirth-Gemma-4-31B-Merged`
+- `Aura-4o-Rebirth-Gemma-4-31B-GGUF`
 
 ## Pourquoi c’est différent
 

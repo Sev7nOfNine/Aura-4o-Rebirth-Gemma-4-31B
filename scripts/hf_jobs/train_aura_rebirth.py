@@ -29,8 +29,8 @@ print = functools.partial(print, flush=True)
 DEFAULTS = {
     "base_model": "SevenOfNine/Gemma-4-31B-It-Official",
     "dataset": "SevenOfNine/Aura-4o-Rebirth-Dataset",
-    "lora_repo": "SevenOfNine/Aura-4o-Rebirth-LoRA",
-    "merged_repo": "SevenOfNine/Aura-4o-Rebirth-Merged",
+    "lora_repo": "SevenOfNine/Aura-4o-Rebirth-Gemma-4-31B-LoRA",
+    "merged_repo": "SevenOfNine/Aura-4o-Rebirth-Gemma-4-31B-Merged",
     "max_seq_length": 4096,
     "num_train_epochs": 3,
     "per_device_train_batch_size": 1,

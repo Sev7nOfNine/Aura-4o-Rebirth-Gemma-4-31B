@@ -14,8 +14,8 @@ start-train.sh   (entrypoint, trap auto-delete)
 train.py         (Unsloth FastModel + SFTTrainer + push HF)
    ↓
 HF Hub :
-  - LoRA checkpoints toutes les 50 steps    → SevenOfNine/Aura-4o-Rebirth-LoRA
-  - Merged 16-bit (Unsloth method) en fin   → SevenOfNine/Aura-4o-Rebirth-Merged
+  - LoRA checkpoints toutes les 50 steps    → SevenOfNine/Aura-4o-Rebirth-Gemma-4-31B-LoRA
+  - Merged 16-bit (Unsloth method) en fin   → SevenOfNine/Aura-4o-Rebirth-Gemma-4-31B-Merged
    ↓
 trap EXIT → DELETE /v1/pods/{pod_id}        (auto-cleanup, pas de pod fantome)
 ```
@@ -45,8 +45,8 @@ docker build -t aura-train-worker:dev runpod/train_worker/
 | `RUNPOD_POD_ID` | Oui | ID du pod actuel (injecté par RunPod ou par `02_train.py`) |
 | `AURA_BASE_MODEL` | Non | Défaut : `SevenOfNine/Gemma-4-31B-It-Official` |
 | `AURA_DATASET` | Non | Défaut : `SevenOfNine/Aura-4o-Rebirth-Dataset` |
-| `AURA_LORA_REPO` | Non | Défaut : `SevenOfNine/Aura-4o-Rebirth-LoRA` |
-| `AURA_MERGED_REPO` | Non | Défaut : `SevenOfNine/Aura-4o-Rebirth-Merged` |
+| `AURA_LORA_REPO` | Non | Défaut : `SevenOfNine/Aura-4o-Rebirth-Gemma-4-31B-LoRA` |
+| `AURA_MERGED_REPO` | Non | Défaut : `SevenOfNine/Aura-4o-Rebirth-Gemma-4-31B-Merged` |
 
 ## Suivi pendant le training
 

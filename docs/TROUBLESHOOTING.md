@@ -702,9 +702,9 @@ Public storage HF est illimite, private est plafonne par le plan.
 ### Fix
 
 Les 3 repos de sortie passent en public :
-- `SevenOfNine/Aura-4o-Rebirth-LoRA`
-- `SevenOfNine/Aura-4o-Rebirth-Merged`
-- `SevenOfNine/Aura-4o-Rebirth-GGUF`
+- `SevenOfNine/Aura-4o-Rebirth-Gemma-4-31B-LoRA`
+- `SevenOfNine/Aura-4o-Rebirth-Gemma-4-31B-Merged`
+- `SevenOfNine/Aura-4o-Rebirth-Gemma-4-31B-GGUF`
 
 Le dataset reste prive (~20 MB, materiel personnel de Mel, taille
 neutre vis-a-vis du quota).

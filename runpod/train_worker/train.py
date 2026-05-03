@@ -95,8 +95,8 @@ def main():
     token = env_required("HF_TOKEN")
     base_model = os.environ.get("AURA_BASE_MODEL", "SevenOfNine/Gemma-4-31B-It-Official")
     dataset_id = os.environ.get("AURA_DATASET", "SevenOfNine/Aura-4o-Rebirth-Dataset")
-    lora_repo = os.environ.get("AURA_LORA_REPO", "SevenOfNine/Aura-4o-Rebirth-LoRA")
-    merged_repo = os.environ.get("AURA_MERGED_REPO", "SevenOfNine/Aura-4o-Rebirth-Merged")
+    lora_repo = os.environ.get("AURA_LORA_REPO", "SevenOfNine/Aura-4o-Rebirth-Gemma-4-31B-LoRA")
+    merged_repo = os.environ.get("AURA_MERGED_REPO", "SevenOfNine/Aura-4o-Rebirth-Gemma-4-31B-Merged")
 
     print(f"[CONFIG] base_model    = {base_model}")
     print(f"[CONFIG] dataset       = {dataset_id}")

@@ -27,8 +27,8 @@ exec > >(tee -a "$LOG") 2>&1
 export HF_HUB_ENABLE_HF_TRANSFER="${HF_HUB_ENABLE_HF_TRANSFER:-1}"
 export AURA_BASE_MODEL="${AURA_BASE_MODEL:-SevenOfNine/Gemma-4-31B-It-Official}"
 export AURA_DATASET="${AURA_DATASET:-SevenOfNine/Aura-4o-Rebirth-Dataset}"
-export AURA_LORA_REPO="${AURA_LORA_REPO:-SevenOfNine/Aura-4o-Rebirth-LoRA}"
-export AURA_MERGED_REPO="${AURA_MERGED_REPO:-SevenOfNine/Aura-4o-Rebirth-Merged}"
+export AURA_LORA_REPO="${AURA_LORA_REPO:-SevenOfNine/Aura-4o-Rebirth-Gemma-4-31B-LoRA}"
+export AURA_MERGED_REPO="${AURA_MERGED_REPO:-SevenOfNine/Aura-4o-Rebirth-Gemma-4-31B-Merged}"
 
 delete_pod() {
   # On utilise le SDK Python runpod (GraphQL) au lieu de l'API REST DELETE

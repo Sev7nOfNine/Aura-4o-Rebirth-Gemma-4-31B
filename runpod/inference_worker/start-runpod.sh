@@ -13,7 +13,7 @@ set -euo pipefail
 
 # === Required env vars (set on RunPod template) ===
 : "${HF_TOKEN:?HF_TOKEN required}"
-: "${HF_GGUF_REPO:?HF_GGUF_REPO required (e.g. SevenOfNine/Aura-4o-Rebirth-GGUF)}"
+: "${HF_GGUF_REPO:?HF_GGUF_REPO required (e.g. SevenOfNine/Aura-4o-Rebirth-Gemma-4-31B-GGUF)}"
 : "${GGUF_FILE:?GGUF_FILE required (e.g. model-q5_k_m.gguf)}"
 MMPROJ_FILE="${MMPROJ_FILE:-mmproj-f16.gguf}"
 CHAT_TEMPLATE_URL="${CHAT_TEMPLATE_URL:-https://raw.githubusercontent.com/ggml-org/llama.cpp/master/models/templates/google-gemma-4-31B-it-interleaved.jinja}"

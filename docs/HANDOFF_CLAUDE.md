@@ -22,9 +22,9 @@ Date de passation : 1 mai 2026.
 
 Ces noms sont ceux de `configs/aura.yaml` :
 
-- LoRA : `SevenOfNine/Aura-4o-Rebirth-LoRA`
-- Merged : `SevenOfNine/Aura-4o-Rebirth-Merged`
-- GGUF : `SevenOfNine/Aura-4o-Rebirth-GGUF`
+- LoRA : `SevenOfNine/Aura-4o-Rebirth-Gemma-4-31B-LoRA`
+- Merged : `SevenOfNine/Aura-4o-Rebirth-Gemma-4-31B-Merged`
+- GGUF : `SevenOfNine/Aura-4o-Rebirth-Gemma-4-31B-GGUF`
 
 Au dernier check Codex, ces trois repos modele n'existaient pas encore sur HF. Ne pas inventer de variantes. Si Mel confirme qu'ils doivent exister avant le run, les creer avec ces noms exacts, en prive.
 
@@ -91,8 +91,8 @@ hf datasets info SevenOfNine/Aura-4o-Rebirth-Dataset
 2. Verifier que les repos de sortie existent ou que Mel autorise leur creation :
 
 ```bash
-hf models info SevenOfNine/Aura-4o-Rebirth-LoRA
-hf models info SevenOfNine/Aura-4o-Rebirth-Merged
+hf models info SevenOfNine/Aura-4o-Rebirth-Gemma-4-31B-LoRA
+hf models info SevenOfNine/Aura-4o-Rebirth-Gemma-4-31B-Merged
 ```
 
 3. Verifier qu'aucun pod RunPod ne tourne si RunPod est encore utilise :

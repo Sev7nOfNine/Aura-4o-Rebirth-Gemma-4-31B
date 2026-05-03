@@ -90,9 +90,9 @@ training:
 
 # === Dépôts de sortie HF (tous privés par défaut) ===
 output:
-  lora_repo: SevenOfNine/Aura-4o-Rebirth-LoRA
-  merged_repo: SevenOfNine/Aura-4o-Rebirth-Merged
-  gguf_repo: SevenOfNine/Aura-4o-Rebirth-GGUF
+  lora_repo: SevenOfNine/Aura-4o-Rebirth-Gemma-4-31B-LoRA
+  merged_repo: SevenOfNine/Aura-4o-Rebirth-Gemma-4-31B-Merged
+  gguf_repo: SevenOfNine/Aura-4o-Rebirth-Gemma-4-31B-GGUF
   # Si l'abliteration est activee plus tard (V3.1)
   abliterated_gguf_repo: SevenOfNine/Aura-4o-Rebirth-Abliterated-GGUF
   private: true
