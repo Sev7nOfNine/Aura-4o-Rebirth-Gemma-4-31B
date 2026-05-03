@@ -200,15 +200,20 @@ cloudflare_worker:
 
 # === Registre des modeles supportes ===
 models:
-  # disk_train_gb_min : peak realiste = base BF16 (~params*2 GB) + merged 16-bit save (~params*2 GB)
-  #                     + working (~5-10 GB). Cache HF est shared avec download donc pas double.
+  # disk_train_gb_min : peak realiste pour un run complet incluant export GGUF.
+  # Composantes : base BF16 (~params*2 GB) + merged 16-bit save (~params*2 GB)
+  #             + GGUF F16 intermediate (~params*2 GB, le piege oublie)
+  #             + checkpoints (~5-7 GB) + working (~5-10 GB).
+  # Si le script ne nettoie pas merged/ apres push HF avant GGUF export,
+  # ces 3 etapes peuvent coexister sur disque -> peak (params*6 + 15) GB.
   # Le 02_train.py applique disk_safety_factor (1.30 par defaut) sur ce minimum.
+  # Lecon E4B 3 mai 2026 : 60 GB ne suffisait pas, GGUF a crashe a "no disk space".
   gemma-4-31b:
     hf_id: google/gemma-4-31B-it
     params_b: 31
     family: gemma
     vram_train_gb_min: 40
-    disk_train_gb_min: 130
+    disk_train_gb_min: 180
     vram_infer_gb_min: 22
     disk_infer_gb_min: 30
   gemma-4-31b-mirror:
@@ -217,7 +222,7 @@ models:
     params_b: 31
     family: gemma
     vram_train_gb_min: 40
-    disk_train_gb_min: 130
+    disk_train_gb_min: 180
     vram_infer_gb_min: 22
     disk_infer_gb_min: 30
   gemma-4-26b-a4b:
@@ -225,7 +230,7 @@ models:
     params_b: 26
     family: gemma
     vram_train_gb_min: 35
-    disk_train_gb_min: 110
+    disk_train_gb_min: 150
     vram_infer_gb_min: 18
     disk_infer_gb_min: 28
   gemma-4-e4b:
@@ -233,7 +238,7 @@ models:
     params_b: 4
     family: gemma
     vram_train_gb_min: 8
-    disk_train_gb_min: 30
+    disk_train_gb_min: 100
     vram_infer_gb_min: 5
     disk_infer_gb_min: 12
   qwen-2.5-32b:
@@ -241,7 +246,7 @@ models:
     params_b: 32
     family: qwen
     vram_train_gb_min: 40
-    disk_train_gb_min: 135
+    disk_train_gb_min: 180
     vram_infer_gb_min: 22
     disk_infer_gb_min: 30
   qwen-2.5-14b:
@@ -249,7 +254,7 @@ models:
     params_b: 14
     family: qwen
     vram_train_gb_min: 22
-    disk_train_gb_min: 65
+    disk_train_gb_min: 90
     vram_infer_gb_min: 11
     disk_infer_gb_min: 18
   llama-3.3-70b:
@@ -257,7 +262,7 @@ models:
     params_b: 70
     family: llama
     vram_train_gb_min: 75
-    disk_train_gb_min: 290
+    disk_train_gb_min: 380
     vram_infer_gb_min: 50
     disk_infer_gb_min: 60
   llama-3.1-8b:
@@ -265,7 +270,7 @@ models:
     params_b: 8
     family: llama
     vram_train_gb_min: 12
-    disk_train_gb_min: 40
+    disk_train_gb_min: 100
     vram_infer_gb_min: 7
     disk_infer_gb_min: 15
   mistral-small-24b:
@@ -273,7 +278,7 @@ models:
     params_b: 24
     family: mistral
     vram_train_gb_min: 32
-    disk_train_gb_min: 100
+    disk_train_gb_min: 140
     vram_infer_gb_min: 18
     disk_infer_gb_min: 25
 
