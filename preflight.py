@@ -136,7 +136,7 @@ def check_github_action(state):
                 "run",
                 "list",
                 "--repo",
-                "Sev7nOfNine/Aura-4o-Rebirth",
+                "Sev7nOfNine/Aura-4o-Rebirth-Gemma-4-31B",
                 "--workflow",
                 "Build & Push Worker Image",
                 "--limit",

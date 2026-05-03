@@ -19,7 +19,7 @@ hf jobs uv run \
   --timeout 30h \
   --secrets HF_TOKEN \
   --detach \
-  https://raw.githubusercontent.com/Sev7nOfNine/Aura-4o-Rebirth/main/scripts/hf_jobs/train_aura_rebirth.py
+  https://raw.githubusercontent.com/Sev7nOfNine/Aura-4o-Rebirth-Gemma-4-31B/main/scripts/hf_jobs/train_aura_rebirth.py
 ```
 
 ## Si les repos de sortie n'existent pas encore
@@ -34,7 +34,7 @@ hf jobs uv run \
   --timeout 30h \
   --secrets HF_TOKEN \
   --detach \
-  https://raw.githubusercontent.com/Sev7nOfNine/Aura-4o-Rebirth/main/scripts/hf_jobs/train_aura_rebirth.py \
+  https://raw.githubusercontent.com/Sev7nOfNine/Aura-4o-Rebirth-Gemma-4-31B/main/scripts/hf_jobs/train_aura_rebirth.py \
   --allow-create-output-repos
 ```
 

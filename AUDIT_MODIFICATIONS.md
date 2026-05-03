@@ -2,7 +2,7 @@
 
 Date: 2026-05-01  
 Commit verifie: `ce97764`  
-Depot: `Sev7nOfNine/Aura-4o-Rebirth`
+Depot: `Sev7nOfNine/Aura-4o-Rebirth-Gemma-4-31B`
 
 ## Resume
 

@@ -4,7 +4,7 @@ Date de passation : 1 mai 2026.
 
 ## Etat actuel
 
-- GitHub cible : `Sev7nOfNine/Aura-4o-Rebirth`, branche `main`.
+- GitHub cible : `Sev7nOfNine/Aura-4o-Rebirth-Gemma-4-31B`, branche `main`.
 - Hugging Face dataset propre : `SevenOfNine/Aura-4o-Rebirth-Dataset`.
 - Hugging Face dataset raw : `SevenOfNine/Aura-4o-Rebirth-Dataset-Raw`.
 - RunPod : aucun pod actif au moment de la passation.
@@ -54,7 +54,7 @@ hf jobs uv run \
   --timeout 30h \
   --secrets HF_TOKEN \
   --detach \
-  https://raw.githubusercontent.com/Sev7nOfNine/Aura-4o-Rebirth/main/scripts/hf_jobs/train_aura_rebirth.py
+  https://raw.githubusercontent.com/Sev7nOfNine/Aura-4o-Rebirth-Gemma-4-31B/main/scripts/hf_jobs/train_aura_rebirth.py
 ```
 
 Par defaut, le script refuse de creer les repos de sortie si `LoRA` ou `Merged` sont absents. C'est volontaire pour respecter la consigne "pas de nouveau repo par accident".
@@ -67,7 +67,7 @@ hf jobs uv run \
   --timeout 30h \
   --secrets HF_TOKEN \
   --detach \
-  https://raw.githubusercontent.com/Sev7nOfNine/Aura-4o-Rebirth/main/scripts/hf_jobs/train_aura_rebirth.py \
+  https://raw.githubusercontent.com/Sev7nOfNine/Aura-4o-Rebirth-Gemma-4-31B/main/scripts/hf_jobs/train_aura_rebirth.py \
   --allow-create-output-repos
 ```
 
