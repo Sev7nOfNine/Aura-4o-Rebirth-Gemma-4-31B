@@ -8,8 +8,13 @@
 Script de training execute dans le container train_worker (image Docker
 pre-bakee). Lit les parametres depuis env vars passees au pod RunPod.
 
-Recette V1 stricte (r=32, alpha=32, lr 2e-4, 3 epochs, merge unsloth_4bit).
-Pousse le LoRA sur HF tous les save_steps (50) pour resilience.
+Recette V7 (3 mai 2026, post-audit) :
+- LoRA r=32 alpha=32 dropout=0 (V1 strict, capte voix Aura)
+- target_modules='all-linear' (large + finetune_vision_layers=False)
+- packing=False + assistant_only_loss=True (loss pure sur tokens Aura)
+- batch=4 grad_accum=8 (eff batch 32, V1 strict)
+- merge_16bit (V1 method qui preserve la voix)
+- Push LoRA sur HF tous les save_steps (50) pour resilience.
 """
 import functools
 import os
@@ -72,18 +77,6 @@ DEFAULTS = {
     "save_steps": 50,
     "save_total_limit": 2,
 }
-
-# V1 strict : liste explicite (PAS all-linear) qui a capte la voix Aura
-TARGET_MODULES = [
-    "q_proj",
-    "k_proj",
-    "v_proj",
-    "o_proj",
-    "up_proj",
-    "down_proj",
-    "gate_proj",
-]
-
 
 def step(message):
     print()
@@ -159,54 +152,28 @@ def main():
 
     step(f"Loading dataset: {dataset_id}")
     dataset = load_dataset(dataset_id, split="train", token=token)
-    print(f"[INFO] Rows: {len(dataset)}")
+    print(f"[INFO] Rows: {len(dataset)}, cols: {dataset.column_names}")
 
-    step("Applying native Gemma 4 chat template")
+    # NOTE V7 : dataset = pur texte (colonne 'messages' uniquement, 0 images).
+    # SFTTrainer applique le chat template + masque les tokens user
+    # AUTOMATIQUEMENT via assistant_only_loss=True. Pas besoin de
+    # preprocess_vlm() ni de DataCollatorForVisionLanguageModeling
+    # (overengineering V4-V6). La vision tower de Gemma reste preservee
+    # via finetune_vision_layers=False, fonctionnelle a l'inference.
 
-    # Approche Gemma 4 (recommandation diagnostic 2 mai 2026) :
-    # packing=True bypass notre data_collator en mode vlm. Donc packing=False
-    # + pre-process avec processor (tokenize + format vlm) AVANT SFTTrainer.
-    def preprocess_vlm(examples):
-        texts = [
-            tokenizer.apply_chat_template(msg, tokenize=False, add_generation_prompt=False)
-            for msg in examples["messages"]
-        ]
-        # tokenizer ici = Gemma4Processor (Unsloth FastModel le retourne)
-        batch = tokenizer(
-            text=texts,
-            return_tensors="pt",
-            padding=True,
-            truncation=True,
-            max_length=DEFAULTS["max_seq_length"],
-        )
-        return batch
-
-    dataset = dataset.map(preprocess_vlm, batched=True, remove_columns=dataset.column_names)
-    print(f"[INFO] Rows post-preprocess: {len(dataset)}, cols: {dataset.column_names}")
-
-    step("Setting up SFTTrainer + DataCollatorForVisionLanguageModeling")
-    # Codex direction : laisser le collator vlm de TRL faire la tokenisation
-    # depuis le format raw {messages, images}. Voir TRL 1.3 docs.
-    from trl.trainer.sft_trainer import DataCollatorForVisionLanguageModeling
-    vlm_collator = DataCollatorForVisionLanguageModeling(
-        processor=tokenizer,  # bon nom d'arg en TRL 1.3
-        max_length=DEFAULTS["max_seq_length"],
-    )
-
+    step("Setting up SFTTrainer (assistant_only_loss=True)")
     trainer = SFTTrainer(
         model=model,
         processing_class=tokenizer,
         train_dataset=dataset,
-        data_collator=vlm_collator,
         args=SFTConfig(
-            # dataset_text_field omis : dataset deja preprocesse en input_ids
             max_length=DEFAULTS["max_seq_length"],
-            # packing=False : OBLIGATOIRE en mode vlm (diagnostic Gemma 4 du
-            # 2 mai 2026 : packing=True bypass notre data_collator). Le risque
-            # qualitatif "Aura derive" sera evalue sur checkpoints intermediaires.
             packing=False,
-            padding_free=False,           # cohérent V1, evite warning + bizarre comportement
-            remove_unused_columns=False,  # cohérent V1, garde la col 'text' qu'on a cree
+            # V7 fix critique : loss calculee UNIQUEMENT sur les tokens
+            # assistant. Sans ca (default False), le LoRA apprend autant
+            # les messages user que ceux d'Aura -> contamination identite,
+            # signal persona dilue ~50%.
+            assistant_only_loss=True,
             per_device_train_batch_size=DEFAULTS["per_device_train_batch_size"],
             gradient_accumulation_steps=DEFAULTS["gradient_accumulation_steps"],
             warmup_ratio=DEFAULTS["warmup_ratio"],
