@@ -43,9 +43,15 @@ base_model:
 # r=32 alpha=32 c'est non standard (ratio 1:1) mais c'est ce qui a marche.
 # Voir docs/METHODOLOGY.md pour le pourquoi des choix.
 training:
+  # V6 (3 mai 2026, direction Gemma 4 chat AI Studio) :
+  # - packing=False OBLIGATOIRE en mode vlm (sinon TRL bypass notre data_collator)
+  # - batch=4 + grad_accum=8 (effective batch=32 conserve, comme V1)
+  # - Voir runpod/train_worker/train.py qui hardcode ces DEFAULTS et IGNORE ce yaml
+  #   sur packing/batch/grad_accum. Ce yaml reste source de verite documentaire.
+  # - Si retour a packing=True : downgrader TRL a 0.23.0 (cf. memoire feedback)
   num_train_epochs: 3
-  per_device_train_batch_size: 1
-  gradient_accumulation_steps: 32       # eff batch 32, comme V1
+  per_device_train_batch_size: 4        # V6: monte de 1 a 4 (batch effectif 32 conserve)
+  gradient_accumulation_steps: 8        # V6: descend de 32 a 8 (eff batch 4*8=32)
   learning_rate: 2.0e-4                 # V1 strict
   warmup_ratio: 0.03
   lr_scheduler_type: cosine
@@ -54,7 +60,7 @@ training:
   load_in_4bit: true
   bf16: true
   optim: adamw_8bit
-  packing: true
+  packing: false                        # V6: OBLIGATOIRE en vlm (Gemma 4 direction)
   seed: 3407
   logging_steps: 5
   # Checkpoints intermediaires : LoRA pousse sur HF tous les save_steps.
