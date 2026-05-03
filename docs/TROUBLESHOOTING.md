@@ -1,5 +1,33 @@
 # AURA+++ REBIRTH - Pieges connus et leurs fixes
 
+## ⚡ V6 EN COURS (3 mai 2026) - direction Gemma 4
+
+Apres marathons V4/V5 bloques sur le check anti-packing+vlm de TRL 1.3,
+direction de Gemma 4 (chat AI Studio) : **packing=False est OBLIGATOIRE en
+mode vlm**. Le data_collator custom ne peut pas etre bypasse par packing,
+sinon l'apprentissage se fait sur des sequences melangees inconsistantes.
+
+**Setup V6 valide (training en cours sur pod rbl66m9kf2tn28)** :
+- TRL 1.3.0 + Unsloth 2026.4.8 + transformers 5.5.0
+- `packing=False`
+- `per_device_train_batch_size=4` + `gradient_accumulation_steps=8`
+  (effective batch 32, conserve comme V1)
+- `target_modules='all-linear'` (laisse PEFT detecter)
+- preprocess_vlm() avec apply_chat_template + tokenizer pre-tokenisation
+- DataCollatorForVisionLanguageModeling(processor=tokenizer)
+
+**Trade-off accepte par Mel** : training plus long (~30h A40 vs ~10h en
+packing=True theorique) car chaque paire = une sequence (pas de
+concatenation). Mais qualite semantique meilleure (pas de
+cross-contamination entre conversations). Loss step 5 = 5.5 → step 60 =
+1.67 → descente saine, pas de delire observe.
+
+**Si retour a packing=True souhaite plus tard** : downgrader TRL a 0.23.0
+et re-tester. Les sections 8c/8d ci-dessous documentent l'historique du
+debat packing=True vs False.
+
+---
+
 Doc vivante des bugs rencontres pendant le pipeline et de la maniere
 de les eviter pour les prochains runs (ce projet ou un autre modele
 qui partirait de cette base).

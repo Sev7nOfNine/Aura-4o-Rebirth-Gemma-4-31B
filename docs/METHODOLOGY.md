@@ -15,6 +15,17 @@ La recette retenue est volontairement proche de celle qui a capté la voix Aura 
 
 L’objectif est d’ajouter la personnalité sans casser les capacités générales du modèle.
 
+### Hyperparams V6 (en cours, 3 mai 2026)
+
+- `r=32`, `alpha=32`, `dropout=0.0`, `target_modules='all-linear'`
+- `lr=2e-4`, `cosine`, `warmup_ratio=0.03`, `weight_decay=0.01`
+- `epochs=3`, `batch=4`, `grad_accum=8` (effective batch 32)
+- `max_seq_length=4096`, `bf16`, `load_in_4bit=True`, `optim=adamw_8bit`
+- **`packing=False`** (obligatoire en vlm, voir TROUBLESHOOTING.md section V6)
+
+Source de vérité runtime : `runpod/train_worker/train.py` (DEFAULTS hardcodes).
+`configs/aura.yaml` est synchronisé pour rester documentaire fiable.
+
 ## Pourquoi le merge puis l’abliteration
 
 L’ordre retenu est :
