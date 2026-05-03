@@ -209,16 +209,34 @@ def main():
     api.upload_folder(folder_path="/workspace/lora", repo_id=lora_repo, repo_type="model")
     print("[OK] LoRA pushed")
 
-    step(f"Saving merged model (Unsloth 4-bit method) and pushing to {merged_repo}")
-    # save_method='merged_16bit' = methode V1 qui preserve la voix
-    # (V2 bf16_clean a fait du fade tonal, on n'y revient pas).
-    model.save_pretrained_merged(
-        "/workspace/merged",
-        tokenizer,
-        save_method="merged_16bit",
+    step(f"Clean merge via PEFT (NOT Unsloth) -> {merged_repo}")
+    # WARNING (lesson from V7 E4B May 3 2026):
+    # Unsloth's save_pretrained_merged(merged_16bit) corrupts the lm_head
+    # weights for Gemma 4 E4B (and possibly other Gemma 4 variants).
+    # Symptom: post-merge model outputs [multimodal] in a loop.
+    # Fix: drop Unsloth, use PEFT's merge_and_unload via a fresh
+    # transformers reload of the base model.
+    import gc
+    del trainer  # free Unsloth-trained model handle
+    del model
+    gc.collect()
+    torch.cuda.empty_cache()
+
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+    from peft import PeftModel
+    print("[merge] reloading base via transformers (clean)...")
+    clean_base = AutoModelForCausalLM.from_pretrained(
+        base_model, torch_dtype=torch.bfloat16, device_map="auto", token=token,
     )
+    clean_tok = AutoTokenizer.from_pretrained(base_model, token=token)
+    print("[merge] applying LoRA + merge_and_unload...")
+    peft_model = PeftModel.from_pretrained(clean_base, "/workspace/lora")
+    clean_merged = peft_model.merge_and_unload()
+    print("[merge] saving clean merged...")
+    clean_merged.save_pretrained("/workspace/merged", safe_serialization=True)
+    clean_tok.save_pretrained("/workspace/merged")
     api.upload_folder(folder_path="/workspace/merged", repo_id=merged_repo, repo_type="model")
-    print("[OK] Merged pushed")
+    print("[OK] Merged pushed (clean PEFT merge, not Unsloth)")
 
     if torch.cuda.is_available():
         print(f"[INFO] Peak CUDA memory: {torch.cuda.max_memory_allocated() / 1024**3:.2f} GB")
