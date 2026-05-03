@@ -45,8 +45,8 @@ jobs:
           # Les noms de dépôt Docker doivent être en minuscules. Le propriétaire
           # 'Sev7nOfNine' contient des majuscules, donc on fixe la version minuscule.
           tags: |
-            ghcr.io/sev7nofnine/aura-4o-rebirth-worker:latest
-            ghcr.io/sev7nofnine/aura-4o-rebirth-worker:${{ github.sha }}
+            ghcr.io/sev7nofnine/aura-4o-rebirth-gemma-4-31b-worker:latest
+            ghcr.io/sev7nofnine/aura-4o-rebirth-gemma-4-31b-worker:${{ github.sha }}
           platforms: linux/amd64
           cache-from: type=gha
           cache-to: type=gha,mode=max

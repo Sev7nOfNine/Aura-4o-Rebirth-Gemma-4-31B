@@ -59,8 +59,8 @@ jobs:
           # Les noms Docker doivent etre minuscules. Owner 'Sev7nOfNine'
           # contient des majuscules, on fixe explicitement.
           tags: |
-            ghcr.io/sev7nofnine/aura-4o-rebirth-train-worker:latest
-            ghcr.io/sev7nofnine/aura-4o-rebirth-train-worker:${{ github.sha }}
+            ghcr.io/sev7nofnine/aura-4o-rebirth-gemma-4-31b-train-worker:latest
+            ghcr.io/sev7nofnine/aura-4o-rebirth-gemma-4-31b-train-worker:${{ github.sha }}
           platforms: linux/amd64
           cache-from: type=gha
           cache-to: type=gha,mode=max

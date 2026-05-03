@@ -129,7 +129,7 @@ runpod_train:
   # (cf. docs/TROUBLESHOOTING.md incident #5).
   # Build via .github/workflows/build-train-worker.yml a chaque push de
   # runpod/train_worker/**.
-  container_image: ghcr.io/sev7nofnine/aura-4o-rebirth-train-worker:latest
+  container_image: ghcr.io/sev7nofnine/aura-4o-rebirth-gemma-4-31b-train-worker:latest
   ssh_port: 22
   vram_safety_factor: 1.15  # +15% marge VRAM
   disk_safety_factor: 1.30  # +30% marge disque

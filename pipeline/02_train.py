@@ -6,7 +6,7 @@
 ╚════════════════════════════════════════╝
 
 Lance un pod RunPod avec l'image train_worker pré-bakée
-(`ghcr.io/sev7nofnine/aura-4o-rebirth-train-worker:latest`).
+(`ghcr.io/sev7nofnine/aura-4o-rebirth-gemma-4-31b-train-worker:latest`).
 
 Le pod boot avec toutes les deps Unsloth/transformers déjà installées,
 l'entrypoint `start-train.sh` se lance automatiquement et :

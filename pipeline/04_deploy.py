@@ -20,9 +20,9 @@ Pre-requis :
 
 Exemple :
   python 04_deploy.py \\
-      --worker-image sevenofnine/aura-4o-rebirth-worker:latest
+      --worker-image sevenofnine/aura-4o-rebirth-gemma-4-31b-worker:latest
 
-  python 04_deploy.py --worker-image ghcr.io/sev7nofnine/aura-4o-rebirth-worker:latest --dry-run
+  python 04_deploy.py --worker-image ghcr.io/sev7nofnine/aura-4o-rebirth-gemma-4-31b-worker:latest --dry-run
 """
 import argparse
 import json

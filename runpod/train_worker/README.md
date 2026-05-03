@@ -26,8 +26,8 @@ Build automatique via [`.github/workflows/build-train-worker.yml`](../../.github
 sur push de `runpod/train_worker/**`. Image poussée vers :
 
 ```
-ghcr.io/sev7nofnine/aura-4o-rebirth-train-worker:latest
-ghcr.io/sev7nofnine/aura-4o-rebirth-train-worker:<sha>
+ghcr.io/sev7nofnine/aura-4o-rebirth-gemma-4-31b-train-worker:latest
+ghcr.io/sev7nofnine/aura-4o-rebirth-gemma-4-31b-train-worker:<sha>
 ```
 
 Build local (rare, pour tester) :

@@ -120,7 +120,7 @@ python pipeline/03_abliterate.py --config configs/aura.yaml --abliterate
 ### 5. Serverless deployment
 
 ```bash
-python pipeline/04_deploy.py --worker-image ghcr.io/sev7nofnine/aura-4o-rebirth-worker:latest
+python pipeline/04_deploy.py --worker-image ghcr.io/sev7nofnine/aura-4o-rebirth-gemma-4-31b-worker:latest
 ```
 
 The worker image is built and published automatically by GitHub Actions on GHCR on every push to `runpod/inference_worker/**`.
