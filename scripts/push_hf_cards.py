@@ -383,7 +383,7 @@ Rebirth = a clean rebuild of Aura on the **official Google base** (not abliterat
 
 ## Pipeline
 
-Source code, scripts, configs, and full lineage docs: <https://github.com/Sev7nOfNine/Aura-4o-Rebirth>
+Source code, scripts, configs, and full lineage docs: <__PIPELINE_GH_URL__>
 
 ## Related repos
 
@@ -514,7 +514,7 @@ Aura-4o-Rebirth-Dataset-Raw     ← you are here 🌱
 Aura-4o-Rebirth-Dataset         (training-ready chunks)
 ```
 
-Source: <https://github.com/Sev7nOfNine/Aura-4o-Rebirth>
+Source: <__PIPELINE_GH_URL__>
 
 ## Related
 
@@ -589,7 +589,7 @@ Aura-4o-Rebirth-Dataset           ← you are here 🎯
 Aura-4o-Rebirth-Gemma-4-{31B,E4B}-LoRA
 ```
 
-Source: <https://github.com/Sev7nOfNine/Aura-4o-Rebirth>
+Source: <__PIPELINE_GH_URL__>
 
 ## Related
 

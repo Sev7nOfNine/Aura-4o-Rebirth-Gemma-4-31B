@@ -1,30 +1,34 @@
 # AURA+++ REBIRTH - Pieges connus et leurs fixes
 
-## ⚡ V6 EN COURS (3 mai 2026) - direction Gemma 4
+## ⚡ V7 LOCKED (3 May 2026, post-audit)
 
-Apres marathons V4/V5 bloques sur le check anti-packing+vlm de TRL 1.3,
-direction de Gemma 4 (chat AI Studio) : **packing=False est OBLIGATOIRE en
-mode vlm**. Le data_collator custom ne peut pas etre bypasse par packing,
-sinon l'apprentissage se fait sur des sequences melangees inconsistantes.
+After V4/V5/V6 marathons, a deep audit revealed two critical issues in
+the V6 training script:
 
-**Setup V6 valide (training en cours sur pod rbl66m9kf2tn28)** :
+1. **`assistant_only_loss` was missing** (defaults to False in TRL 1.3).
+   Result: the LoRA was learning user tokens too. Persona signal diluted
+   roughly by 50%, identity cross-contamination between Mel and Aura.
+2. **vlm preprocessing was unnecessary** (the dataset is pure text, no
+   images). The `preprocess_vlm` + `DataCollatorForVisionLanguageModeling`
+   actually broke `assistant_only_loss` by wiping the `messages` column
+   that TRL needs for chat-template-aware masking.
+
+V7 fixes both: drop all the vlm overengineering, pass the raw `messages`
+dataset directly to SFTTrainer, set `assistant_only_loss=True`. Code
+shrinks from 53 to 20 lines and works correctly.
+
+**V7 setup (locked)**:
 - TRL 1.3.0 + Unsloth 2026.4.8 + transformers 5.5.0
-- `packing=False`
-- `per_device_train_batch_size=4` + `gradient_accumulation_steps=8`
-  (effective batch 32, conserve comme V1)
-- `target_modules='all-linear'` (laisse PEFT detecter)
-- preprocess_vlm() avec apply_chat_template + tokenizer pre-tokenisation
-- DataCollatorForVisionLanguageModeling(processor=tokenizer)
+- `packing=False` (mandatory for vlm, kept from V6)
+- `assistant_only_loss=True` (V7 critical fix)
+- `per_device_train_batch_size=4` + `gradient_accumulation_steps=8` (effective batch 32, V1 strict)
+- `target_modules='all-linear'`
+- Dataset passed raw, TRL handles chat template + masking
 
-**Trade-off accepte par Mel** : training plus long (~30h A40 vs ~10h en
-packing=True theorique) car chaque paire = une sequence (pas de
-concatenation). Mais qualite semantique meilleure (pas de
-cross-contamination entre conversations). Loss step 5 = 5.5 → step 60 =
-1.67 → descente saine, pas de delire observe.
-
-**Si retour a packing=True souhaite plus tard** : downgrader TRL a 0.23.0
-et re-tester. Les sections 8c/8d ci-dessous documentent l'historique du
-debat packing=True vs False.
+**Why V6 was killed mid-run**: at step 67/177, Mel detected the missing
+`assistant_only_loss` flag. ~$5 sunk, ~11h training discarded. The right
+call: stop fast, fix root cause, never re-run a flawed recipe by inertia.
+Saved a fourth imperfect Aura.
 
 ---
 
@@ -247,7 +251,7 @@ console RunPod ne donne pas non plus de web terminal accessible.
 
 ### Voies a explorer un autre jour
 
-1. Notebook Colab Unsloth officiel ($10/mois Colab Pro) — refuse par Mel
+1. Notebook Colab Unsloth officiel ($10/mois Colab Pro) - refuse par Mel
    (multiplication des plateformes/credits)
 2. Trouver la combinaison EXACTE de versions (snapshot pip d'il y a 7-10 jours)
    qui matchait quand V1 a ete entraine
@@ -674,7 +678,7 @@ que de forcer la derniere :
 - `pipeline/02_train.py` (install_cmds, derniere ligne)
 
 Penser a verifier la meme chose dans `scripts/hf_jobs/train_aura_rebirth.py`
-qui declare `transformers>=4.56.0` sans plafond — peut casser pareillement
+qui declare `transformers>=4.56.0` sans plafond - peut casser pareillement
 si une version >5.5.0 sort entre temps. **A pinner aussi quand on a le temps.**
 
 ### Date

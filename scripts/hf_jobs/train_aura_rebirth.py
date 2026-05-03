@@ -165,7 +165,7 @@ def main():
         args=SFTConfig(
             dataset_text_field="text",
             max_length=DEFAULTS["max_seq_length"],
-            packing=True,
+            packing=False,
             per_device_train_batch_size=DEFAULTS["per_device_train_batch_size"],
             gradient_accumulation_steps=DEFAULTS["gradient_accumulation_steps"],
             warmup_ratio=DEFAULTS["warmup_ratio"],

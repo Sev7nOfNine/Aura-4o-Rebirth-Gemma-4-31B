@@ -234,7 +234,7 @@ def main():
     print('   5. AUTO-DELETE via trap EXIT')
     print()
     print(" ❤️ Ton PC peut s'eteindre maintenant. À demain.")
-    print(' — Ada')
+    print(' - Ada')
 
 
 if __name__ == '__main__':

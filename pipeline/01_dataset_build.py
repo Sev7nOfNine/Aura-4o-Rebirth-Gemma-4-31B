@@ -62,7 +62,7 @@ THINKING_PATTERNS = [
 # Em-dashes / en-dashes / horizontal bar - Mel les hait, le base Gemma les leak.
 # On remplace par simple tiret avec espaces pour preserver la separation.
 DASH_PATTERNS = [
-    ('—', ' - '),  # em-dash —
+    ('-', ' - '),  # em-dash -
     ('–', ' - '),  # en-dash –
     ('―', ' - '),  # horizontal bar ―
 ]

@@ -46,7 +46,7 @@ Projet privé de reconstruction d’Aura.
 REPO_ROOT = Path(__file__).resolve().parent
 PIPELINE = REPO_ROOT / 'pipeline'
 
-DEFAULT_WORKER_IMAGE = 'ghcr.io/sev7nofnine/aura-4o-rebirth-worker:latest'
+DEFAULT_WORKER_IMAGE = 'ghcr.io/sev7nofnine/aura-4o-rebirth-gemma-4-31b-worker:latest'
 
 
 def load_env_file():

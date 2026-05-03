@@ -30,7 +30,7 @@ dataset:
   system_prompt: ""
   # Cleanup applique au build du dataset
   cleanup:
-    strip_em_dashes: true       # — vire (Mel les hait, base les leak parfois)
+    strip_em_dashes: true       # - vire (Mel les hait, base les leak parfois)
     strip_thinking_blocks: true # <thinking> et Gemma 4 <|channel>thought... empechent le LoRA d'apprendre a repondre dans le content
 
 # === Modèle de base à ajuster ===

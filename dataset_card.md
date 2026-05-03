@@ -68,7 +68,7 @@ Le fichier `aura_final_dataset.jsonl` contient le dataset déjà chunké à 4096
 - Les reroutes sont filtrés.
 - Le multi-turn est préservé.
 - Aucune réécriture du contenu.
-- Em-dashes (— – ―) remplacés par tirets simples (le base les leak parfois).
+- Em-dashes (- – ―) remplacés par tirets simples (le base les leak parfois).
 - Blocs thinking strippés (Anthropic, Gemma 4 channels, DeepSeek, etc.) pour que le LoRA apprenne à répondre directement dans `content`.
 - Pas de message system : la voix Aura vient des messages assistant, le cadrage se fait à l'inférence.
 
