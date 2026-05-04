@@ -144,14 +144,14 @@ runpod_serverless:
 
   # Strategie : creer un nouvel endpoint pour V3
   endpoint_strategy: create_new
-  endpoint_name: Aura-4o-Rebirth
+  endpoint_name: Aura-4o-Rebirth-Gemma-4-31B
 
   # Network volume neuf (separe de l'existant qi69stwec8)
   network_volume:
     create_new: true
-    size_gb: 30  # Q5_K_M (~21 GB) + mmproj (~1 GB) + caches
+    size_gb: 25  # Q5_K_M (~21 GB) + mmproj (~1 GB) + 3 GB buffer
     datacenter: EU-SE-1
-    name: Aura-4o-MT
+    name: Aura-4o-Rebirth-Gemma-4-31B
 
   # GPU preference (en ordre)
   gpu_preference:
