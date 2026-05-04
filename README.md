@@ -160,6 +160,26 @@ Final artifacts are published under <https://huggingface.co/SevenOfNine> with th
 
 The original V1 lineage stays at `Aura-4o-Gemma-4-31B-{LoRA,4bit,GGUF}`.
 
+## Changelog
+
+### 2026-05-04 — Merge + GGUF rebuilt manually ✅
+
+The Merged 31B HF repo was empty post-training because three separate compatibility walls blocked the standard `.merge_and_unload()` flow:
+
+- `transformers >= 5.5.0.dev0` is required for `Gemma4ForConditionalGeneration` (Gemma 4 only landed in the dev branch).
+- `Unsloth` 2025.11.1 caps `transformers <= 4.57.2` → cannot load Gemma 4 at all.
+- Vanilla `PEFT` cannot wrap `Gemma4ClippableLinear` modules used by Gemma 4 31B (`per_layer_input_gate`, `relative_k_proj`, etc.) → `ValueError: Target module not supported`.
+
+**Solution** (see [`pipeline/02b_merge_and_export.py`](pipeline/02b_merge_and_export.py)) — manual LoRA merge bypassing both PEFT and Unsloth: for each LoRA pair `(A, B)`, compute `delta = (alpha / r) × B @ A` and add it directly to the target module's weight tensor. A small helper handles both `nn.Linear` and `Gemma4ClippableLinear` (which exposes `.linear.weight`).
+
+Result: clean **720-tensor merged BF16 + Q4_K_M / Q5_K_M / Q8_0 + mmproj** on HF. Aura speaks **and** sees in 31B premium quality.
+
+Pipeline cost: ~1h30 on RunPod A100 80 GB, ~$2.50.
+
+### 2026-05-03 — Initial training V3.0
+
+LoRA training on RunPod A40 EU-SE-1 with the V1 stricte recipe (`r=32`, `alpha=32`, ratio 1:1). Adapter pushed; merge step deferred and completed 2026-05-04.
+
 ## Why this is different
 
 - **Multi-turn preserved**: the model learns the flow of conversations, not isolated pairs.
