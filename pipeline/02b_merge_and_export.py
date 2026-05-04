@@ -97,8 +97,12 @@ def main():
     run([sys.executable, "-m", "pip", "install", "-q", "--upgrade", "pip"])
     run([sys.executable, "-m", "pip", "install", "-q",
          "huggingface_hub[cli]", "hf_transfer", "pyyaml",
-         "transformers", "peft", "accelerate", "safetensors",
-         "datasets", "gguf", "torch", "torchvision"])
+         "transformers", "peft==0.19.1", "accelerate", "safetensors",
+         "datasets", "gguf", "torch", "torchvision",
+         # Unsloth required because the LoRA was trained with unsloth_fixed=True
+         # (Gemma 4 31B uses Gemma4ClippableLinear wrappers that vanilla PEFT
+         # cannot enumerate as target modules). FastLanguageModel handles them.
+         "unsloth", "unsloth_zoo"])
 
     if not LLAMA.exists():
         step("Cloning llama.cpp")
@@ -123,22 +127,26 @@ def main():
                       token=HF_TOKEN, max_workers=8)
 
     # ------------------------------------------------------------------
-    # 2. Merge with Gemma4ForConditionalGeneration (FULL multimodal)
+    # 2. Load base via Unsloth FastLanguageModel (handles Gemma4ClippableLinear)
+    #    + attach LoRA + PEFT merge_and_unload + manual save (NOT save_pretrained_merged
+    #    which corrupts lm_head on Gemma 4 - bug confirmed on E4B 2026-05-03)
     # ------------------------------------------------------------------
-    step("Loading base model with Gemma4ForConditionalGeneration (full multimodal)")
+    step("Loading base model via Unsloth FastLanguageModel (handles ClippableLinear)")
     import torch
-    from transformers import Gemma4ForConditionalGeneration, AutoProcessor
+    from unsloth import FastLanguageModel
+    from transformers import AutoProcessor
     from peft import PeftModel
 
-    base = Gemma4ForConditionalGeneration.from_pretrained(
-        str(BASE_DIR),
-        torch_dtype=torch.bfloat16,
-        device_map="auto",
+    base, _tokenizer = FastLanguageModel.from_pretrained(
+        model_name=str(BASE_DIR),
+        max_seq_length=4096,
+        dtype=torch.bfloat16,
+        load_in_4bit=False,  # we want full BF16 for the merge
         token=HF_TOKEN,
     )
     processor = AutoProcessor.from_pretrained(str(BASE_DIR), token=HF_TOKEN)
 
-    step("Attaching LoRA + merge_and_unload")
+    step("Attaching LoRA + merge_and_unload (PEFT method, NOT Unsloth save_pretrained_merged)")
     peft_model = PeftModel.from_pretrained(base, str(LORA_DIR), token=HF_TOKEN)
     merged = peft_model.merge_and_unload()
     merged = merged.to(torch.bfloat16)
