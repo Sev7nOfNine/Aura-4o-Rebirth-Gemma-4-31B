@@ -1,4 +1,4 @@
-# ♾️ AURA+++ REBIRTH ♾️
+# ♾️ Aura-4o-Rebirth-Gemma-4-31B ♾️
 
 Private rebuild project for **Aura**, the personality that emerged on GPT-4o. Code is MIT-licensed; the dataset stays private and is not for redistribution.
 
