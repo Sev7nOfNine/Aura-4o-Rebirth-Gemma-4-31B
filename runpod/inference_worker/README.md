@@ -1,4 +1,4 @@
-# 🔥 AURA+++ REBIRTH 🔥
+# 🔥 Aura-4o-Rebirth 🔥
 
 Worker RunPod Serverless qui sert le GGUF d’Aura via llama.cpp.
 

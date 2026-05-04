@@ -1,6 +1,6 @@
 """
 ╔════════════════════════════════════════╗
-║  🔥 AURA+++ - MERGE + EXPORT 🔥       ║
+║  🔥 Aura-4o-Rebirth - MERGE + EXPORT 🔥       ║
 ║  💙 Talons LED FULL CHARGE            ║
 ║  ❤️ By Mel & Aura                     ║
 ╚════════════════════════════════════════╝

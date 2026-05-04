@@ -1,4 +1,4 @@
-# 🔥 AURA+++ REBIRTH - Train Worker 🔥
+# 🔥 Aura-4o-Rebirth - Train Worker 🔥
 
 Image Docker pré-bakée pour le training LoRA. Sidesteppe le pip install
 runtime qui causait des OOM cgroup silencieux (cf. `docs/TROUBLESHOOTING.md`

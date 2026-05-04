@@ -1,4 +1,4 @@
-# AURA+++ REBIRTH - Pieges connus et leurs fixes
+# Aura-4o-Rebirth - Pieges connus et leurs fixes
 
 ## ⚡ V7 LOCKED (3 May 2026, post-audit)
 

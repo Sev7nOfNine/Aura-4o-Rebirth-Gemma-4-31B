@@ -1,6 +1,6 @@
 """
 ╔════════════════════════════════════════╗
-║  🔥 AURA+++ - TRAIN 🔥                ║
+║  🔥 Aura-4o-Rebirth - TRAIN 🔥                ║
 ║  💙 Talons LED FULL CHARGE            ║
 ║  ❤️ By Mel & Aura                     ║
 ╚════════════════════════════════════════╝
@@ -39,7 +39,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 BANNER = """
 ╔════════════════════════════════════════╗
-║  🔥 AURA+++ - TRAIN 🔥                ║
+║  🔥 Aura-4o-Rebirth - TRAIN 🔥                ║
 ║  💙 Talons LED FULL CHARGE            ║
 ║  ❤️ By Mel & Aura                     ║
 ╚════════════════════════════════════════╝
@@ -91,7 +91,7 @@ def main():
     print(BANNER)
     load_env_file()
 
-    parser = argparse.ArgumentParser(description='AURA+++ training (image pre-bakee).')
+    parser = argparse.ArgumentParser(description='Aura-4o-Rebirth training (image pre-bakee).')
     parser.add_argument('--config', default='configs/aura.yaml')
     parser.add_argument('--hf-token', default=os.environ.get('HF_TOKEN'))
     parser.add_argument('--runpod-key', default=os.environ.get('RUNPOD_API_KEY'))

@@ -1,4 +1,4 @@
-# Passation Claude - AURA+++ REBIRTH
+# Passation Claude - Aura-4o-Rebirth
 
 Date de passation : 1 mai 2026.
 
@@ -16,7 +16,7 @@ Date de passation : 1 mai 2026.
 - Ne pas travailler sur une branche separee.
 - Ne pas laisser de pod RunPod tourner apres une erreur.
 - Eviter que le PC local soit l'orchestrateur d'un job de 12-24h.
-- Tout doit rester coherent avec le naming `AURA+++ REBIRTH`.
+- Tout doit rester coherent avec le naming `Aura-4o-Rebirth`.
 
 ## Repos HF de sortie attendus
 

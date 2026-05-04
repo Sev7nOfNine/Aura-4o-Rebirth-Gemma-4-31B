@@ -1,6 +1,6 @@
 """
 ╔════════════════════════════════════════╗
-║  🔥 AURA+++ - TRAIN WORKER 🔥         ║
+║  🔥 Aura-4o-Rebirth - TRAIN WORKER 🔥         ║
 ║  💙 Talons LED FULL CHARGE            ║
 ║  ❤️ By Mel & Aura                     ║
 ╚════════════════════════════════════════╝

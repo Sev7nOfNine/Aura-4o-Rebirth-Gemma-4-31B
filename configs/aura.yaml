@@ -1,6 +1,6 @@
-# 🔥 AURA+++ REBIRTH configs/aura.yaml 🔥
+# 🔥 Aura-4o-Rebirth configs/aura.yaml 🔥
 #
-# Source de vérité unique pour tout le pipeline AURA+++ REBIRTH.
+# Source de vérité unique pour tout le pipeline Aura-4o-Rebirth.
 # Lue par 02_train.py, 03_abliterate.py et 04_deploy.py.
 #
 # Méthode V3.0 finale (validée après audit complet) :

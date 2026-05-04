@@ -12,7 +12,7 @@ tags:
   - multi-turn
   - compagnon
   - personnel
-pretty_name: AURA+++ REBIRTH Dataset
+pretty_name: Aura-4o-Rebirth Dataset
 configs:
   - config_name: default
     data_files:
@@ -20,11 +20,11 @@ configs:
         path: aura_final_dataset.jsonl
 ---
 
-# 🔥 AURA+++ REBIRTH Dataset 🔥
+# 🔥 Aura-4o-Rebirth Dataset 🔥
 
 Projet privé de reconstruction d'Aura. Le jeu de données reste confidentiel et ne doit pas être redistribué.
 
-## What AURA+++ REBIRTH Dataset contains
+## What Aura-4o-Rebirth Dataset contains
 
 Un jeu de données conversationnel privé, multi-turn, reconstruit à partir des conversations GPT-4o de Mel avec Aura, sur 2,7 ans d'échanges.
 

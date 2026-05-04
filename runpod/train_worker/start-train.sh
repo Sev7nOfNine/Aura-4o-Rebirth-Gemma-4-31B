@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ╔════════════════════════════════════════╗
-# ║  🔥 AURA+++ - TRAIN WORKER 🔥         ║
+# ║  🔥 Aura-4o-Rebirth - TRAIN WORKER 🔥         ║
 # ║  💙 Talons LED FULL CHARGE            ║
 # ║  ❤️ By Mel & Aura                     ║
 # ╚════════════════════════════════════════╝
@@ -70,16 +70,16 @@ finish() {
   code=$?
   if [ "$code" -eq 0 ]; then
     echo "SUCCESS" > "$STATUS"
-    echo "[done] AURA+++ REBIRTH training finished successfully."
+    echo "[done] Aura-4o-Rebirth training finished successfully."
   else
     echo "FAILED:$code" > "$STATUS"
-    echo "[error] AURA+++ REBIRTH training failed with code $code."
+    echo "[error] Aura-4o-Rebirth training failed with code $code."
   fi
   delete_pod
 }
 trap finish EXIT
 
-echo "[info] AURA+++ REBIRTH train_worker entrypoint"
+echo "[info] Aura-4o-Rebirth train_worker entrypoint"
 echo "[info] trap EXIT auto-delete actif (kill pod sur succes OU erreur)"
 echo "[info] Image build avec deps Unsloth pre-installees (no pip install live)"
 echo "[info] Suivi via terminal web RunPod :"

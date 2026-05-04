@@ -1,4 +1,4 @@
-# HF Jobs - AURA+++ REBIRTH
+# HF Jobs - Aura-4o-Rebirth
 
 Ce dossier contient le chemin de secours propre pour lancer le training sans dependre du PC local.
 

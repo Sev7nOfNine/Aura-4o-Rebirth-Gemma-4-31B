@@ -12,7 +12,7 @@
 #   "trackio>=0.2.0",
 # ]
 # ///
-"""Training AURA+++ REBIRTH pour Hugging Face Jobs.
+"""Training Aura-4o-Rebirth pour Hugging Face Jobs.
 
 Ce script ne depend pas du PC local : il charge le dataset depuis HF,
 entraine le LoRA, puis pousse LoRA + merged vers les repos HF configures.
@@ -63,7 +63,7 @@ def step(message):
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="AURA+++ REBIRTH HF Jobs trainer")
+    parser = argparse.ArgumentParser(description="Aura-4o-Rebirth HF Jobs trainer")
     parser.add_argument("--base-model", default=DEFAULTS["base_model"])
     parser.add_argument("--dataset", default=DEFAULTS["dataset"])
     parser.add_argument("--lora-repo", default=DEFAULTS["lora_repo"])

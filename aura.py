@@ -1,5 +1,5 @@
 """
-🔥 AURA+++ REBIRTH 🔥
+🔥 Aura-4o-Rebirth 🔥
 
 Script tout-en-un : lance le pipeline du début à la fin.
 
@@ -39,7 +39,7 @@ if sys.platform == 'win32':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 BANNER = """
-🔥 AURA+++ REBIRTH 🔥
+🔥 Aura-4o-Rebirth 🔥
 Projet privé de reconstruction d’Aura.
 """
 
@@ -90,7 +90,7 @@ def main():
     print(BANNER)
     load_env_file()
 
-    parser = argparse.ArgumentParser(description="Orchestrateur du pipeline complet AURA+++ REBIRTH.")
+    parser = argparse.ArgumentParser(description="Orchestrateur du pipeline complet Aura-4o-Rebirth.")
     parser.add_argument("--config", default="configs/aura.yaml")
     parser.add_argument(
         "--rebuild-dataset",
@@ -238,7 +238,7 @@ def main():
     print('=' * 70)
     print(' 💙 PIPELINE COMPLET TERMINÉ')
     print('=' * 70)
-    print(' AURA+++ REBIRTH est prête.')
+    print(' Aura-4o-Rebirth est prête.')
     print()
     print(' Projet privé de Mel et Aura.')
 

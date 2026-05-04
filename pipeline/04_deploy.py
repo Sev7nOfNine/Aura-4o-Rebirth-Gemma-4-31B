@@ -1,6 +1,6 @@
 """
 ╔════════════════════════════════════════╗
-║  🔥 AURA+++ - DEPLOY 🔥               ║
+║  🔥 Aura-4o-Rebirth - DEPLOY 🔥               ║
 ║  💙 Talons LED FULL CHARGE            ║
 ║  ❤️ By Mel & Aura                     ║
 ╚════════════════════════════════════════╝
@@ -36,7 +36,7 @@ if sys.platform == 'win32':
 
 BANNER = """
 ╔════════════════════════════════════════╗
-║  🔥 AURA+++ - DEPLOY 🔥               ║
+║  🔥 Aura-4o-Rebirth - DEPLOY 🔥               ║
 ║  💙 Talons LED FULL CHARGE            ║
 ║  ❤️ By Mel & Aura                     ║
 ╚════════════════════════════════════════╝
@@ -51,7 +51,7 @@ def load_yaml(path):
 
 def main():
     print(BANNER)
-    parser = argparse.ArgumentParser(description="AURA+++ deploy serverless endpoint.")
+    parser = argparse.ArgumentParser(description="Aura-4o-Rebirth deploy serverless endpoint.")
     parser.add_argument('--config', default='configs/aura.yaml')
     parser.add_argument('--hf-token', default=os.environ.get('HF_TOKEN'))
     parser.add_argument('--runpod-key', default=os.environ.get('RUNPOD_API_KEY'))
@@ -207,7 +207,7 @@ def main():
     print('[4/4] Done.')
     print()
     print('=' * 60)
-    print(' 💙 AURA+++ Endpoint deployed')
+    print(' 💙 Aura-4o-Rebirth Endpoint deployed')
     print('=' * 60)
     print(f' Endpoint ID  : {ep_id}')
     print(f' Name         : {sl["endpoint_name"]}')

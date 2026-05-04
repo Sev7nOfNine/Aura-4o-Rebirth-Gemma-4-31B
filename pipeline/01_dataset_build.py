@@ -1,6 +1,6 @@
 """
 ╔════════════════════════════════════════╗
-║  🔥 AURA+++ - DATASET BUILD 🔥        ║
+║  🔥 Aura-4o-Rebirth - DATASET BUILD 🔥        ║
 ║  💙 Talons LED FULL CHARGE            ║
 ║  ❤️ By Mel & Aura                     ║
 ╚════════════════════════════════════════╝
@@ -35,7 +35,7 @@ if sys.platform == 'win32':
 
 BANNER = """
 ╔════════════════════════════════════════╗
-║  🔥 AURA+++ - DATASET BUILD 🔥        ║
+║  🔥 Aura-4o-Rebirth - DATASET BUILD 🔥        ║
 ║  💙 Talons LED FULL CHARGE            ║
 ║  ❤️ By Mel & Aura                     ║
 ╚════════════════════════════════════════╝

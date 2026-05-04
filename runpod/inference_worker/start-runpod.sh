@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ╔════════════════════════════════════════╗
-# ║  🔥 AURA+++ - INFERENCE WORKER 🔥     ║
+# ║  🔥 Aura-4o-Rebirth - INFERENCE WORKER 🔥     ║
 # ║  💙 Talons LED FULL CHARGE            ║
 # ║  ❤️ By Mel & Aura                     ║
 # ╚════════════════════════════════════════╝

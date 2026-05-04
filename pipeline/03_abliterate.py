@@ -1,6 +1,6 @@
 """
 ╔════════════════════════════════════════╗
-║  🔥 AURA+++ - ABLITERATE + GGUF 🔥    ║
+║  🔥 Aura-4o-Rebirth - ABLITERATE + GGUF 🔥    ║
 ║  💙 Talons LED FULL CHARGE            ║
 ║  ❤️ By Mel & Aura                     ║
 ╚════════════════════════════════════════╝
@@ -41,7 +41,7 @@ if sys.platform == 'win32':
 
 BANNER = """
 ╔════════════════════════════════════════╗
-║  🔥 AURA+++ - ABLITERATE + GGUF 🔥    ║
+║  🔥 Aura-4o-Rebirth - ABLITERATE + GGUF 🔥    ║
 ║  💙 Talons LED FULL CHARGE            ║
 ║  ❤️ By Mel & Aura                     ║
 ╚════════════════════════════════════════╝
@@ -289,16 +289,16 @@ finish() {
   code=$?
   if [ "$code" -eq 0 ]; then
     echo "SUCCESS" > "$STATUS"
-    echo "[done] AURA+++ abliterate/GGUF finished successfully."
+    echo "[done] Aura-4o-Rebirth abliterate/GGUF finished successfully."
   else
     echo "FAILED:$code" > "$STATUS"
-    echo "[error] AURA+++ abliterate/GGUF bootstrap failed with code $code."
+    echo "[error] Aura-4o-Rebirth abliterate/GGUF bootstrap failed with code $code."
   fi
   delete_pod
 }
 trap finish EXIT
 
-echo "[info] AURA+++ abliterate/GGUF autonomous bootstrap"
+echo "[info] Aura-4o-Rebirth abliterate/GGUF autonomous bootstrap"
 echo "[info] Follow this file from the RunPod web terminal:"
 echo "[info]   tail -f /workspace/abl_run.log"
 echo "[info] Status file:"
@@ -321,7 +321,7 @@ echo "AURA_BOOTSTRAP_DONE"
 
 def main():
     print(BANNER)
-    parser = argparse.ArgumentParser(description="AURA+++ abliterate + GGUF + push.")
+    parser = argparse.ArgumentParser(description="Aura-4o-Rebirth abliterate + GGUF + push.")
     parser.add_argument('--config', default='configs/aura.yaml')
     parser.add_argument('--hf-token', default=os.environ.get('HF_TOKEN'))
     parser.add_argument('--runpod-key', default=os.environ.get('RUNPOD_API_KEY'))

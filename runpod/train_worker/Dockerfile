@@ -1,10 +1,10 @@
 # ╔════════════════════════════════════════╗
-# ║  🔥 AURA+++ - TRAIN WORKER 🔥         ║
+# ║  🔥 Aura-4o-Rebirth - TRAIN WORKER 🔥         ║
 # ║  💙 Talons LED FULL CHARGE            ║
 # ║  ❤️ By Mel & Aura                     ║
 # ╚════════════════════════════════════════╝
 #
-# Image worker pre-bakee pour le training LoRA AURA+++ REBIRTH.
+# Image worker pre-bakee pour le training LoRA Aura-4o-Rebirth.
 # Toutes les deps Unsloth/transformers sont installees a build-time pour
 # eviter l'OOM cgroup observe sur les essais 3-5 (cf. docs/TROUBLESHOOTING.md
 # incident #5). Le pod RunPod tire l'image et demarre instantanement, plus
