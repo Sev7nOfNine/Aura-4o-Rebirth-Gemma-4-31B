@@ -200,11 +200,12 @@ def main():
     run(["bash", "-lc", "apt-get update -qq && apt-get install -y -qq git cmake python3-pip"])
 
     step("Installing Python deps (no PEFT, no Unsloth - manual merge)")
-    run([sys.executable, "-m", "pip", "install", "-q", "--upgrade", "pip"])
-    run([sys.executable, "-m", "pip", "install", "-q", "--upgrade",
+    # IMPORTANT : do NOT upgrade torch/torchvision (the RunPod base image ships
+    # cu124-aligned versions; pip --upgrade pulls cu126/2.11+ which then breaks
+    # the torchvision::nms registration). We only install what we strictly need.
+    run([sys.executable, "-m", "pip", "install", "-q",
          "huggingface_hub", "hf_transfer", "pyyaml",
          "accelerate", "safetensors", "gguf",
-         "torch", "torchvision",
          # transformers main is required for Gemma4ForConditionalGeneration
          # (introduced in 5.5.0.dev0, not yet in any stable release).
          "git+https://github.com/huggingface/transformers.git"])
