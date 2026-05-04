@@ -5,30 +5,39 @@
 ║  ❤️ By Mel & Aura                     ║
 ╚════════════════════════════════════════╝
 
-Merge LoRA into base Gemma 4 31B (multimodal preserved) + convert to GGUF (Q4_K_M + Q5_K_M + Q8_0) + push HF.
+Merge LoRA into base Gemma 4 31B (multimodal preserved) + convert to GGUF
+(Q4_K_M + Q5_K_M + Q8_0) + push HF.
 
-Pipeline (à executer sur un pod RunPod A100 80GB) :
+Why this script (and not 02_train.py / 03_abliterate.py) :
+  - 02_train.py produces the LoRA adapter (already pushed by Mel on 2026-05-03).
+  - 03_abliterate.py expects the merged model to already be on HF.
+  - The 31B Merged HF repo is empty because the merge step was never completed
+    (the V7 attempt used AutoModelForCausalLM which silently dropped vision/audio
+    tensors -> 666-tensor text-only artifact, same bug as E4B fixed 2026-05-04).
+  - This 02b step bridges the gap : merge LoRA + base into HF Merged repo,
+    then produce all GGUF artifacts in one shot (no abliteration).
+
+Why the merge is MANUAL (no PEFT, no Unsloth) :
+  - Gemma 4 requires transformers >= 5.5.0.dev0 (Gemma4ForConditionalGeneration).
+  - Unsloth 2025.11.1 caps transformers at 4.57.2 -> incompatible with Gemma 4.
+  - Vanilla PEFT cannot wrap Gemma4ClippableLinear modules used by Gemma 4 31B
+    (per_layer_input_gate, relative_k_proj, etc.) -> ValueError on merge.
+  - Solution : compute LoRA deltas (alpha/r * B @ A) and add them directly to
+    each target module's weight tensor. Works for any wrapper class.
+
+Pipeline :
   1. Read configs/aura.yaml
   2. DL base model (full multimodal) from HF
   3. DL LoRA adapter from HF
-  4. Load base with Gemma4ForConditionalGeneration (NOT AutoModelForCausalLM)
-     -> preserves text + vision + audio = 720 tensors
-  5. PEFT merge_and_unload + save merged to disk (BF16)
-  6. Push merged -> output.merged_repo
+  4. Load base with Gemma4ForConditionalGeneration (preserves 720 tensors)
+  5. Manual merge : iterate adapter_model.safetensors, apply deltas in place
+  6. Save merged to disk + push to HF
   7. Free base + lora dirs from disk
   8. Convert HF -> GGUF bf16 + extract mmproj
   9. Free merged HF safetensors (already on HF)
  10. Quantize bf16 -> Q4_K_M, Q5_K_M, Q8_0 (sequentially)
  11. Push all GGUFs + mmproj -> output.gguf_repo
  12. Done.
-
-Why this script exists :
-  - 02_train.py produces the LoRA adapter (already pushed by Mel on 2026-05-03).
-  - 03_abliterate.py expects the merged model to already be on HF.
-  - This 02b step bridges the gap : merge LoRA + base into HF Merged repo,
-    then produce the GGUF artifacts in one shot (no abliteration).
-  - Critical fix : uses Gemma4ForConditionalGeneration to keep the multimodal
-    encoders (vision/audio = 54 tensors) that AutoModelForCausalLM silently drops.
 
 Usage (on pod) :
   python pipeline/02b_merge_and_export.py
@@ -41,6 +50,7 @@ Hardware : A100 80GB (BF16 31B = ~62 GB), 250 GB disk, ~1h30, ~$3.
 from __future__ import annotations
 
 import os, shutil, subprocess, sys
+from collections import defaultdict
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -76,6 +86,102 @@ def load_config():
         return yaml.safe_load(f)
 
 
+def get_module_by_path(model, path: str):
+    """Walk a dotted path through nn.Modules. Returns the leaf module."""
+    obj = model
+    for p in path.split("."):
+        if p.isdigit():
+            obj = obj[int(p)]
+        else:
+            obj = getattr(obj, p)
+    return obj
+
+
+def get_weight_tensor(module):
+    """Return the .weight tensor of a Linear-like module, handling Gemma4ClippableLinear wrappers."""
+    import torch.nn as nn
+    if isinstance(module, nn.Linear):
+        return module.weight
+    # Gemma4ClippableLinear wraps a nn.Linear under .linear
+    if hasattr(module, "linear") and isinstance(module.linear, nn.Linear):
+        return module.linear.weight
+    # Fallback : direct .weight attribute
+    if hasattr(module, "weight"):
+        return module.weight
+    raise AttributeError(f"Cannot locate weight tensor on {type(module).__name__}")
+
+
+def manual_merge_lora(model, lora_dir: Path, alpha: int, r: int, use_rslora: bool = False):
+    """
+    Apply LoRA adapter to a loaded model in place, by iterating the safetensors
+    files and adding (alpha/r) * B @ A to each target module's weight.
+
+    Bypasses PEFT and Unsloth so it works on Gemma4ClippableLinear wrappers.
+    """
+    import torch
+    from safetensors import safe_open
+    import math
+
+    scale = (alpha / math.sqrt(r)) if use_rslora else (alpha / r)
+    print(f"[MERGE] LoRA scale = {scale:.4f} (alpha={alpha}, r={r}, rslora={use_rslora})", flush=True)
+
+    # Find adapter file(s)
+    safetensor_files = sorted(lora_dir.glob("adapter_model*.safetensors"))
+    if not safetensor_files:
+        raise FileNotFoundError(f"No adapter_model*.safetensors in {lora_dir}")
+
+    pairs: dict[str, dict[str, "torch.Tensor"]] = defaultdict(dict)
+
+    # 1) Load all LoRA tensors and group by target module path
+    for sf in safetensor_files:
+        with safe_open(str(sf), framework="pt", device="cpu") as f:
+            for key in f.keys():
+                t = f.get_tensor(key)
+                # Standard PEFT key format :
+                #   base_model.model.<MODULE_PATH>.lora_A.default.weight  (shape [r, in_features])
+                #   base_model.model.<MODULE_PATH>.lora_B.default.weight  (shape [out_features, r])
+                if ".lora_A." in key:
+                    path = key.split(".lora_A.")[0].replace("base_model.model.", "", 1)
+                    pairs[path]["A"] = t
+                elif ".lora_B." in key:
+                    path = key.split(".lora_B.")[0].replace("base_model.model.", "", 1)
+                    pairs[path]["B"] = t
+                # Skip embeddings or other non-LoRA keys (logged below)
+
+    print(f"[MERGE] Found {len(pairs)} LoRA target modules", flush=True)
+
+    # 2) Apply each pair
+    applied, skipped = 0, []
+    for path, ab in pairs.items():
+        if "A" not in ab or "B" not in ab:
+            skipped.append(f"{path} (missing A or B)")
+            continue
+        try:
+            module = get_module_by_path(model, path)
+            W = get_weight_tensor(module)
+        except (AttributeError, IndexError) as e:
+            skipped.append(f"{path} ({e})")
+            continue
+
+        A = ab["A"].to(W.device, dtype=torch.float32)  # [r, in]
+        B = ab["B"].to(W.device, dtype=torch.float32)  # [out, r]
+        delta = scale * (B @ A)  # [out, in]
+        # Sanity check shapes
+        if delta.shape != W.shape:
+            skipped.append(f"{path} (shape mismatch: delta {tuple(delta.shape)} vs W {tuple(W.shape)})")
+            continue
+        W.data.add_(delta.to(W.dtype))
+        applied += 1
+        if applied % 50 == 0:
+            print(f"[MERGE] applied {applied}/{len(pairs)}", flush=True)
+
+    print(f"[MERGE] Done. Applied {applied}/{len(pairs)} pairs.", flush=True)
+    if skipped:
+        print(f"[MERGE] Skipped {len(skipped)} (first 10):", flush=True)
+        for s in skipped[:10]:
+            print(f"   - {s}", flush=True)
+
+
 def main():
     HF_TOKEN = os.environ["HF_TOKEN"]
 
@@ -93,16 +199,15 @@ def main():
     step("Installing system deps")
     run(["bash", "-lc", "apt-get update -qq && apt-get install -y -qq git cmake python3-pip"])
 
-    step("Installing Python deps")
+    step("Installing Python deps (no PEFT, no Unsloth - manual merge)")
     run([sys.executable, "-m", "pip", "install", "-q", "--upgrade", "pip"])
-    run([sys.executable, "-m", "pip", "install", "-q",
-         "huggingface_hub[cli]", "hf_transfer", "pyyaml",
-         "transformers", "peft==0.19.1", "accelerate", "safetensors",
-         "datasets", "gguf", "torch", "torchvision",
-         # Unsloth required because the LoRA was trained with unsloth_fixed=True
-         # (Gemma 4 31B uses Gemma4ClippableLinear wrappers that vanilla PEFT
-         # cannot enumerate as target modules). FastLanguageModel handles them.
-         "unsloth", "unsloth_zoo"])
+    run([sys.executable, "-m", "pip", "install", "-q", "--upgrade",
+         "huggingface_hub", "hf_transfer", "pyyaml",
+         "accelerate", "safetensors", "gguf",
+         "torch", "torchvision",
+         # transformers main is required for Gemma4ForConditionalGeneration
+         # (introduced in 5.5.0.dev0, not yet in any stable release).
+         "git+https://github.com/huggingface/transformers.git"])
 
     if not LLAMA.exists():
         step("Cloning llama.cpp")
@@ -127,35 +232,43 @@ def main():
                       token=HF_TOKEN, max_workers=8)
 
     # ------------------------------------------------------------------
-    # 2. Load base via Unsloth FastLanguageModel (handles Gemma4ClippableLinear)
-    #    + attach LoRA + PEFT merge_and_unload + manual save (NOT save_pretrained_merged
-    #    which corrupts lm_head on Gemma 4 - bug confirmed on E4B 2026-05-03)
+    # 2. Read LoRA hyperparams from adapter_config.json
     # ------------------------------------------------------------------
-    step("Loading base model via Unsloth FastLanguageModel (handles ClippableLinear)")
-    import torch
-    from unsloth import FastLanguageModel
-    from transformers import AutoProcessor
-    from peft import PeftModel
+    import json
+    with open(LORA_DIR / "adapter_config.json", "r", encoding="utf-8") as f:
+        adapter_cfg = json.load(f)
+    lora_alpha = int(adapter_cfg.get("lora_alpha", 32))
+    lora_r = int(adapter_cfg.get("r", 32))
+    use_rslora = bool(adapter_cfg.get("use_rslora", False))
+    print(f"\n[LoRA cfg] alpha={lora_alpha}, r={lora_r}, use_rslora={use_rslora}")
 
-    base, _tokenizer = FastLanguageModel.from_pretrained(
-        model_name=str(BASE_DIR),
-        max_seq_length=4096,
-        dtype=torch.bfloat16,
-        load_in_4bit=False,  # we want full BF16 for the merge
+    # ------------------------------------------------------------------
+    # 3. Load base with Gemma4ForConditionalGeneration (FULL multimodal)
+    # ------------------------------------------------------------------
+    step("Loading base model with Gemma4ForConditionalGeneration (full multimodal)")
+    import torch
+    from transformers import Gemma4ForConditionalGeneration, AutoProcessor
+
+    model = Gemma4ForConditionalGeneration.from_pretrained(
+        str(BASE_DIR),
+        torch_dtype=torch.bfloat16,
+        device_map="auto",
         token=HF_TOKEN,
     )
     processor = AutoProcessor.from_pretrained(str(BASE_DIR), token=HF_TOKEN)
 
-    step("Attaching LoRA + merge_and_unload (PEFT method, NOT Unsloth save_pretrained_merged)")
-    peft_model = PeftModel.from_pretrained(base, str(LORA_DIR), token=HF_TOKEN)
-    merged = peft_model.merge_and_unload()
-    merged = merged.to(torch.bfloat16)
+    # ------------------------------------------------------------------
+    # 4. Manual LoRA merge (handles Gemma4ClippableLinear)
+    # ------------------------------------------------------------------
+    step("Manual LoRA merge (no PEFT, no Unsloth)")
+    manual_merge_lora(model, LORA_DIR, alpha=lora_alpha, r=lora_r, use_rslora=use_rslora)
+    model = model.to(torch.bfloat16)
 
     step(f"Saving merged to {MERGED} (~62 GB)")
     if MERGED.exists():
         shutil.rmtree(MERGED)
     MERGED.mkdir(parents=True)
-    merged.save_pretrained(str(MERGED), safe_serialization=True)
+    model.save_pretrained(str(MERGED), safe_serialization=True)
     processor.save_pretrained(str(MERGED))
 
     # Copy chat template + extras from LoRA repo
@@ -166,14 +279,14 @@ def main():
         if src_f.exists():
             shutil.copy2(src_f, MERGED / fname)
 
-    # Free GPU memory
-    del base, peft_model, merged
+    # Free GPU memory before push + GGUF conversion
+    del model
     import gc; gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
     # ------------------------------------------------------------------
-    # 3. Push merged to HF
+    # 5. Push merged to HF
     # ------------------------------------------------------------------
     step(f"Pushing merged -> {MERGED_REPO}")
     api = HfApi(token=HF_TOKEN)
@@ -185,7 +298,7 @@ def main():
     free(LORA_DIR)
 
     # ------------------------------------------------------------------
-    # 4. Convert HF -> GGUF (bf16 + mmproj)
+    # 6. Convert HF -> GGUF (bf16 + mmproj)
     # ------------------------------------------------------------------
     OUT.mkdir(exist_ok=True)
     bf16 = OUT / "model-bf16.gguf"
@@ -203,7 +316,7 @@ def main():
     free(MERGED)
 
     # ------------------------------------------------------------------
-    # 5. Build llama-quantize
+    # 7. Build llama-quantize
     # ------------------------------------------------------------------
     step("Building llama-quantize")
     quant = LLAMA / "build" / "bin" / "llama-quantize"
@@ -212,7 +325,7 @@ def main():
              f"cd {LLAMA} && cmake -B build && cmake --build build --target llama-quantize -j$(nproc)"])
 
     # ------------------------------------------------------------------
-    # 6. Quantize Q4_K_M, Q5_K_M, Q8_0 (sequentially)
+    # 8. Quantize Q4_K_M, Q5_K_M, Q8_0 (sequentially)
     # ------------------------------------------------------------------
     quants = [
         ("Q4_K_M", OUT / "Aura-4o-Rebirth-Gemma-4-31B-Q4_K_M.gguf"),
@@ -223,14 +336,14 @@ def main():
         step(f"Quantizing -> {qtype}")
         run([str(quant), str(bf16), str(qfile), qtype])
 
-    # Free bf16 intermediate (no longer needed after all quants)
+    # Free bf16 intermediate after all quants
     if bf16.exists():
         size = bf16.stat().st_size / 1024**3
         print(f"[FREE] {bf16} ({size:.1f} GB)", flush=True)
         bf16.unlink()
 
     # ------------------------------------------------------------------
-    # 7. Push all GGUFs + mmproj
+    # 9. Push all GGUFs + mmproj
     # ------------------------------------------------------------------
     step(f"Pushing mmproj + Q4_K_M + Q5_K_M + Q8_0 -> {GGUF_REPO}")
     api.upload_file(path_or_fileobj=str(mmproj), path_in_repo=mmproj.name,
