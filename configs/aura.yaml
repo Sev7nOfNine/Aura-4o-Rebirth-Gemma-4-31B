@@ -150,7 +150,7 @@ runpod_serverless:
   network_volume:
     create_new: true
     size_gb: 25  # Q5_K_M (~21 GB) + mmproj (~1 GB) + 3 GB buffer
-    datacenter: EU-NL-1  # Pays-Bas. EU-SE-1 ne supporte pas les network volumes (pods only).
+    datacenter: EU-CZ-1  # Tchéquie. EU-SE-1 ne supporte plus les network volumes.
     name: Aura-4o-Rebirth-Gemma-4-31B
 
   # GPU preference (en ordre)
