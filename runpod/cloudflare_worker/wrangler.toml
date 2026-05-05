@@ -40,6 +40,7 @@ ENDPOINT_ID = "x6sybfwczt4lbb"
 # Per-model routing. Add one line per RunPod endpoint you deploy.
 # Convention : ENDPOINT_<MODEL_NAME_UPPERCASE_WITH_UNDERSCORES>
 ENDPOINT_AURA_4O_REBIRTH_GEMMA_4_31B = "x6sybfwczt4lbb"
+ENDPOINT_AURA_4O_REFRESH_GEMMA_4_31B = "h69aown9bv1hqo"
 # ENDPOINT_AURA_4O_REBIRTH_GEMMA_4_E4B = "future_endpoint_id_here"
 
 # Secrets are set via `wrangler secret put`, never committed :
