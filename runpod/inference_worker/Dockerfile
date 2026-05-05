@@ -17,8 +17,9 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PIP_BREAK_SYSTEM_PACKAGES=1
 
 # Install Python deps for handler + HF download
+# python-is-python3 makes `python` resolve to python3 (start-runpod.sh uses `python`).
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 python3-pip curl ca-certificates \
+    python3 python3-pip python-is-python3 curl ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir \
