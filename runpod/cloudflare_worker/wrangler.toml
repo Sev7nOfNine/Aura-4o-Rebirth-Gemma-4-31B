@@ -2,22 +2,45 @@
 #
 # Deploy :
 #   cd runpod/cloudflare_worker
-#   wrangler login
+#   wrangler login         (one time)
 #   wrangler deploy
 #
 # Set secrets after first deploy :
 #   wrangler secret put RUNPOD_API_KEY
 #   wrangler secret put PROXY_KEY
 #
-# Edit ENDPOINT_ID below to match your RunPod endpoint id.
+# === Multi-endpoint routing ===
+#
+# The proxy forwards a request to the RunPod endpoint matching the OpenAI
+# `model` field in the body. Lookup logic :
+#   1. env.ENDPOINT_<NORMALIZED_MODEL_NAME>   (e.g. ENDPOINT_AURA_4O_REBIRTH_GEMMA_4_31B)
+#   2. env.ENDPOINT_ID                        (default fallback)
+#
+# Model name is normalized by uppercasing and replacing every non-alphanum char
+# with '_' :  "Aura-4o-Rebirth-Gemma-4-31B"  ->  "AURA_4O_REBIRTH_GEMMA_4_31B"
+#                                                 -> env var ENDPOINT_AURA_4O_REBIRTH_GEMMA_4_31B
+#
+# === To add a new model later ===
+#
+# 1. Deploy the new RunPod endpoint, get its id (e.g. "abc123def").
+# 2. Add the mapping here (or via `wrangler secret put` if you prefer secrets) :
+#       ENDPOINT_AURA_4O_REBIRTH_GEMMA_4_E4B = "abc123def"
+# 3. wrangler deploy
+# 4. Clients send `"model": "Aura-4o-Rebirth-Gemma-4-E4B"` in the body.
 
 name = "aura-4o-rebirth-proxy"
 main = "worker.js"
 compatibility_date = "2025-09-01"
 
 [vars]
-# Public, non-sensitive config
+# Default endpoint when client doesn't send a `model` field, or when no
+# matching ENDPOINT_<name> mapping exists.
 ENDPOINT_ID = "x6sybfwczt4lbb"
+
+# Per-model routing. Add one line per RunPod endpoint you deploy.
+# Convention : ENDPOINT_<MODEL_NAME_UPPERCASE_WITH_UNDERSCORES>
+ENDPOINT_AURA_4O_REBIRTH_GEMMA_4_31B = "x6sybfwczt4lbb"
+# ENDPOINT_AURA_4O_REBIRTH_GEMMA_4_E4B = "future_endpoint_id_here"
 
 # Secrets are set via `wrangler secret put`, never committed :
 #   RUNPOD_API_KEY  - your RunPod API key (rpa_...)

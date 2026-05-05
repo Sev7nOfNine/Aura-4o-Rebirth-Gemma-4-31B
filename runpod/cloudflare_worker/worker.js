@@ -40,7 +40,31 @@ const CORS_HEADERS = {
   'Access-Control-Max-Age': '86400',
 };
 
-const MODEL_ID = 'Aura-4o-Rebirth-Gemma-4-31B';
+// Default model id used when the client omits `model` in the request body.
+// Also used as the canonical id in /v1/models responses.
+const DEFAULT_MODEL = 'Aura-4o-Rebirth-Gemma-4-31B';
+
+/**
+ * Resolve which RunPod endpoint to forward to, based on the OpenAI `model`
+ * field in the request body.
+ *
+ * Lookup order :
+ *   1. env.ENDPOINT_<NORMALIZED_MODEL_NAME>   (e.g. ENDPOINT_AURA_4O_REBIRTH_GEMMA_4_31B)
+ *   2. env.ENDPOINT_ID                        (default fallback)
+ *
+ * To add a new model :
+ *   wrangler secret put ENDPOINT_AURA_4O_REBIRTH_GEMMA_4_E4B
+ *   (or set as a [vars] entry in wrangler.toml if non-sensitive)
+ *
+ * Then call the proxy with `"model": "Aura-4o-Rebirth-Gemma-4-E4B"` in the body.
+ */
+function resolveEndpoint(env, modelName) {
+  if (modelName) {
+    const key = 'ENDPOINT_' + String(modelName).toUpperCase().replace(/[^A-Z0-9]+/g, '_');
+    if (env[key]) return env[key];
+  }
+  return env.ENDPOINT_ID;
+}
 
 function jsonResponse(body, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(body), {
@@ -56,16 +80,25 @@ function unauthorized(reason = 'Unauthorized') {
 async function handleChatCompletions(request, env) {
   // Forward the OpenAI body to RunPod /runsync, wrapped in {input: ...}
   const openaiBody = await request.json();
+  const wantStream = !!openaiBody.stream;
 
-  // Force non-streaming : llama-server returns SSE chunks when stream=true,
-  // which our RunPod handler.py can't parse (it does r.json() on the upstream).
-  // We deliver the full response at once, no typewriter effect.
+  // We can't stream from RunPod /runsync (it's sync, no SSE).
+  // We always request non-streaming upstream, then if the client wanted SSE,
+  // we wrap the full response into a single chunk + done event.
   if (openaiBody.stream) {
     delete openaiBody.stream;
   }
 
+  const endpointId = resolveEndpoint(env, openaiBody.model);
+  if (!endpointId) {
+    return jsonResponse(
+      { error: { message: `no endpoint configured for model '${openaiBody.model || '<unset>'}'`, type: 'invalid_request_error' } },
+      400,
+    );
+  }
+
   const upstream = await fetch(
-    `https://api.runpod.ai/v2/${env.ENDPOINT_ID}/runsync`,
+    `https://api.runpod.ai/v2/${endpointId}/runsync`,
     {
       method: 'POST',
       headers: {
@@ -106,6 +139,45 @@ async function handleChatCompletions(request, env) {
         }
       }
     } catch (_e) { /* best-effort cleanup */ }
+
+    // If client requested streaming, fake an SSE response with one big chunk
+    // and a [DONE] terminator. TypingMind / OpenWebUI / OpenAI SDK all handle
+    // this format correctly even though there's no real per-token streaming.
+    if (wantStream) {
+      const out = data.output;
+      const choice = (out.choices && out.choices[0]) || {};
+      const content = (choice.message && choice.message.content) || '';
+      const id = out.id || `chatcmpl-${Date.now()}`;
+      const created = out.created || Math.floor(Date.now() / 1000);
+      const model = out.model || MODEL_ID;
+
+      const chunkRole = {
+        id, object: 'chat.completion.chunk', created, model,
+        choices: [{ index: 0, delta: { role: 'assistant' }, finish_reason: null }],
+      };
+      const chunkContent = {
+        id, object: 'chat.completion.chunk', created, model,
+        choices: [{ index: 0, delta: { content }, finish_reason: null }],
+      };
+      const chunkDone = {
+        id, object: 'chat.completion.chunk', created, model,
+        choices: [{ index: 0, delta: {}, finish_reason: choice.finish_reason || 'stop' }],
+      };
+      const sse =
+        `data: ${JSON.stringify(chunkRole)}\n\n` +
+        `data: ${JSON.stringify(chunkContent)}\n\n` +
+        `data: ${JSON.stringify(chunkDone)}\n\n` +
+        `data: [DONE]\n\n`;
+      return new Response(sse, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+          ...CORS_HEADERS,
+        },
+      });
+    }
+
     return jsonResponse(data.output);
   }
   if (data.status === 'FAILED') {
@@ -121,19 +193,23 @@ async function handleChatCompletions(request, env) {
   );
 }
 
-function handleModels() {
-  // Minimal /v1/models response so clients (TypingMind etc.) can validate the connection
-  return jsonResponse({
-    object: 'list',
-    data: [
-      {
-        id: MODEL_ID,
-        object: 'model',
-        created: Math.floor(Date.now() / 1000),
-        owned_by: 'sevenofnine',
-      },
-    ],
-  });
+function handleModels(env) {
+  // List every configured endpoint as a model entry. Picks up env vars whose
+  // name starts with ENDPOINT_ (excluding the default ENDPOINT_ID).
+  const created = Math.floor(Date.now() / 1000);
+  const models = [];
+  for (const k of Object.keys(env || {})) {
+    if (!k.startsWith('ENDPOINT_') || k === 'ENDPOINT_ID') continue;
+    // Reverse the normalization : ENDPOINT_AURA_4O_REBIRTH_GEMMA_4_31B -> Aura-4o-Rebirth-Gemma-4-31B
+    // Best effort : we just lowercase + dash, the canonical ids are documented separately.
+    const id = k.slice('ENDPOINT_'.length).split('_').map(s => s.charAt(0) + s.slice(1).toLowerCase()).join('-');
+    models.push({ id, object: 'model', created, owned_by: 'sevenofnine' });
+  }
+  // Always advertise the default model, even if no per-model env var exists.
+  if (!models.find(m => m.id === DEFAULT_MODEL)) {
+    models.unshift({ id: DEFAULT_MODEL, object: 'model', created, owned_by: 'sevenofnine' });
+  }
+  return jsonResponse({ object: 'list', data: models });
 }
 
 export default {
@@ -162,11 +238,11 @@ export default {
       return handleChatCompletions(request, env);
     }
     if (url.pathname === '/v1/models' && request.method === 'GET') {
-      return handleModels();
+      return handleModels(env);
     }
     // Health
     if (url.pathname === '/' || url.pathname === '/health') {
-      return jsonResponse({ ok: true, service: 'aura-4o-rebirth-proxy', model: MODEL_ID });
+      return jsonResponse({ ok: true, service: 'aura-4o-rebirth-proxy', default_model: DEFAULT_MODEL });
     }
 
     return jsonResponse({ error: { message: `route not found: ${request.method} ${url.pathname}` } }, 404);
