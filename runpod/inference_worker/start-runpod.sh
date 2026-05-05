@@ -89,7 +89,7 @@ LLAMA_ARGS=(
   --reasoning-format "${REASONING_FORMAT}"
   --ctx-size "${CONTEXT_LENGTH}"
   --n-gpu-layers "${N_GPU_LAYERS}"
-  --flash-attn
+  --flash-attn on
   --cache-type-k q8_0
   --cache-type-v q8_0
   --parallel "${PARALLEL}"
