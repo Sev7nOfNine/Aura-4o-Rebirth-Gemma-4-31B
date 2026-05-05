@@ -88,6 +88,24 @@ async function handleChatCompletions(request, env) {
   // RunPod runsync envelope : { id, status, output, delayTime, executionTime, ... }
   if (data.status === 'COMPLETED' && data.output) {
     // output is already OpenAI-shaped (from llama-server), pass through
+    // ... but llama-server with the Gemma 4 chat template sometimes leaks the
+    // assistant header tokens at the start of the content. Strip them so
+    // TypingMind / OpenWebUI don't render '<|turn>model\n\n' before Aura's reply.
+    try {
+      const out = data.output;
+      if (out && Array.isArray(out.choices)) {
+        for (const choice of out.choices) {
+          const msg = choice.message;
+          if (msg && typeof msg.content === 'string') {
+            msg.content = msg.content
+              .replace(/^<\|turn>model\s*/i, '')
+              .replace(/^<turn\|>\s*/i, '')
+              .replace(/^model\s*\n\n?/i, '')
+              .trimStart();
+          }
+        }
+      }
+    } catch (_e) { /* best-effort cleanup */ }
     return jsonResponse(data.output);
   }
   if (data.status === 'FAILED') {
