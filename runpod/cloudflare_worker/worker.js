@@ -89,6 +89,17 @@ async function handleChatCompletions(request, env) {
     delete openaiBody.stream;
   }
 
+  // Strip tool-calling fields. Neither Refresh (V1) nor Rebirth (V3) were
+  // trained on tool calls, but TypingMind ships `tools` + `tool_choice: auto`
+  // automatically when plugins are enabled. llama-server then tries to coerce
+  // a function call out of the model and returns an empty assistant message
+  // (finish_reason=tool_calls), which TypingMind renders as blank output.
+  // V8 will add native tool calls to the dataset; until then, scrub it.
+  if (openaiBody.tools) delete openaiBody.tools;
+  if (openaiBody.tool_choice) delete openaiBody.tool_choice;
+  if (openaiBody.functions) delete openaiBody.functions;
+  if (openaiBody.function_call) delete openaiBody.function_call;
+
   const endpointId = resolveEndpoint(env, openaiBody.model);
   if (!endpointId) {
     return jsonResponse(
@@ -124,17 +135,64 @@ async function handleChatCompletions(request, env) {
     // ... but llama-server with the Gemma 4 chat template sometimes leaks the
     // assistant header tokens at the start of the content. Strip them so
     // TypingMind / OpenWebUI don't render '<|turn>model\n\n' before Aura's reply.
+    //
+    // V1-Refresh extra : the V1 lineage was trained on dialogues containing
+    // a harmony-style reasoning frame (<|channel>thought ... <channel|>>). With
+    // REASONING_FORMAT=none the worker doesn't strip it, so we filter it here
+    // - but ONLY for Refresh. Rebirth (V3) doesn't emit that format and must
+    // pass through untouched.
+    const isRefresh = /refresh/i.test(String(openaiBody.model || ''));
     try {
       const out = data.output;
       if (out && Array.isArray(out.choices)) {
         for (const choice of out.choices) {
           const msg = choice.message;
           if (msg && typeof msg.content === 'string') {
+            const original = msg.content;
+            if (isRefresh) {
+              let stripped = msg.content
+                // Case 1 : open + close tag present, strip the whole block.
+                .replace(/<\|channel\|?>thought[\s\S]*?<channel\|>>?/gi, '')
+                .replace(/<\|channel\|?>analysis[\s\S]*?<\|channel\|?>final[\s\S]*?<\|message\|?>/gi, '')
+                .replace(/<\|channel\|?>[a-z]+[\s\S]*?<channel\|>>?/gi, '');
+              // Case 2 : open tag without close (V1 sometimes forgets to close).
+              // Strip from <|channel>... until the first line that looks like
+              // real RP content : a blockquote (>), a bold heading (**), a
+              // code fence (```), or a paragraph starting with an emoji + text.
+              const openIdx = stripped.search(/<\|channel\|?>[a-z]+/i);
+              if (openIdx !== -1) {
+                const after = stripped.slice(openIdx);
+                // Try to find a content marker on a fresh line.
+                const m = after.match(/\n(?=(?:>|\*\*|```| ?[\p{Emoji_Presentation}\p{Extended_Pictographic}]))/u);
+                if (m && m.index !== undefined) {
+                  stripped = stripped.slice(0, openIdx) + after.slice(m.index + 1);
+                } else {
+                  // No clear marker - drop only the orphan tag line itself.
+                  stripped = stripped.slice(0, openIdx) + after.replace(/^<\|channel\|?>[a-z]+\s*\n?/i, '');
+                }
+              }
+              // Safety net : if our strip ate everything (or almost), revert to
+              // raw output so the user at least sees SOMETHING. Better a leaked
+              // tag than a blank reply.
+              if (stripped.replace(/\s+/g, '').length >= 4) {
+                msg.content = stripped;
+              }
+              // Mel hates em-dashes. V1 dataset contained a lot of GPT-4o-style
+              // typography, so the model emits em/en-dashes constantly. V3
+              // Rebirth was retrained on a cleaned dataset, V1-Refresh wasn't,
+              // so we scrub typographic dashes here for Refresh only.
+              msg.content = msg.content
+                .replace(/\s*[—–]\s*/g, ', ');
+            }
             msg.content = msg.content
               .replace(/^<\|turn>model\s*/i, '')
               .replace(/^<turn\|>\s*/i, '')
               .replace(/^model\s*\n\n?/i, '')
               .trimStart();
+            // Final safety : never return empty content.
+            if (!msg.content || !msg.content.trim()) {
+              msg.content = original;
+            }
           }
         }
       }
