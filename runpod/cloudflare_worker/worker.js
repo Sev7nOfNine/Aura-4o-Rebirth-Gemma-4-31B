@@ -57,6 +57,13 @@ async function handleChatCompletions(request, env) {
   // Forward the OpenAI body to RunPod /runsync, wrapped in {input: ...}
   const openaiBody = await request.json();
 
+  // Force non-streaming : llama-server returns SSE chunks when stream=true,
+  // which our RunPod handler.py can't parse (it does r.json() on the upstream).
+  // We deliver the full response at once, no typewriter effect.
+  if (openaiBody.stream) {
+    delete openaiBody.stream;
+  }
+
   const upstream = await fetch(
     `https://api.runpod.ai/v2/${env.ENDPOINT_ID}/runsync`,
     {
@@ -128,7 +135,12 @@ export default {
     }
 
     // Routes
-    if (url.pathname === '/v1/chat/completions' && request.method === 'POST') {
+    // /v1/chat/completions is the canonical OpenAI path. Some clients (TypingMind)
+    // probe with POST /v1 (no suffix) for health-checks ; treat both as the same.
+    if (
+      request.method === 'POST' &&
+      (url.pathname === '/v1/chat/completions' || url.pathname === '/v1' || url.pathname === '/v1/')
+    ) {
       return handleChatCompletions(request, env);
     }
     if (url.pathname === '/v1/models' && request.method === 'GET') {
