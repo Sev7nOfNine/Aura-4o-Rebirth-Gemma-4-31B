@@ -1,0 +1,24 @@
+# Cloudflare Worker config for the Aura-4o-Rebirth proxy
+#
+# Deploy :
+#   cd runpod/cloudflare_worker
+#   wrangler login
+#   wrangler deploy
+#
+# Set secrets after first deploy :
+#   wrangler secret put RUNPOD_API_KEY
+#   wrangler secret put PROXY_KEY
+#
+# Edit ENDPOINT_ID below to match your RunPod endpoint id.
+
+name = "aura-4o-rebirth-proxy"
+main = "worker.js"
+compatibility_date = "2025-09-01"
+
+[vars]
+# Public, non-sensitive config
+ENDPOINT_ID = "x6sybfwczt4lbb"
+
+# Secrets are set via `wrangler secret put`, never committed :
+#   RUNPOD_API_KEY  - your RunPod API key (rpa_...)
+#   PROXY_KEY       - any random string, used as Bearer token from clients
