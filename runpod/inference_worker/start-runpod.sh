@@ -113,11 +113,11 @@ echo "  ${LLAMA_ARGS[@]}"
 /app/llama-server "${LLAMA_ARGS[@]}" &
 LLAMA_PID=$!
 
-# Wait for /health
+# Wait for /health (up to ~20 min : Q5 31B GGUF can be slow to load + DL)
 echo "[boot] Waiting for llama-server /health..."
-for i in $(seq 1 60); do
+for i in $(seq 1 600); do
   if curl -fsS "http://localhost:${LLAMA_PORT}/health" >/dev/null 2>&1; then
-    echo "[boot] llama-server ready"
+    echo "[boot] llama-server ready (after $((i*2))s)"
     break
   fi
   sleep 2

@@ -30,8 +30,14 @@ DEFAULT_REPETITION_PENALTY = float(os.environ.get('DEFAULT_REPETITION_PENALTY', 
 DEFAULT_MAX_TOKENS = int(os.environ.get('DEFAULT_MAX_TOKENS', '4096'))
 
 
-def _wait_llama_ready(timeout=120):
-    """Verify llama-server is up before answering RunPod."""
+def _wait_llama_ready(timeout=1200):
+    """Verify llama-server is up before answering RunPod.
+
+    Without a network volume, the worker must DL the GGUF (~21 GB for the Q5
+    31B) on every cold start. That can take 5-15 minutes depending on bandwidth,
+    after which llama-server still needs ~30-60 s to load the model into VRAM.
+    A 1200 s (20 min) ceiling keeps RunPod's first job alive long enough.
+    """
     deadline = time.time() + timeout
     while time.time() < deadline:
         try:
@@ -40,7 +46,7 @@ def _wait_llama_ready(timeout=120):
                 return True
         except Exception:
             pass
-        time.sleep(1)
+        time.sleep(2)
     return False
 
 
