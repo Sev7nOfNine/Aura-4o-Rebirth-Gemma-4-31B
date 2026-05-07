@@ -256,16 +256,21 @@ function handleModels(env) {
   // name starts with ENDPOINT_ (excluding the default ENDPOINT_ID).
   const created = Math.floor(Date.now() / 1000);
   const models = [];
+  const seen = new Set();
+  const addModel = (id) => {
+    const key = id.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    models.push({ id, object: 'model', created, owned_by: 'sevenofnine' });
+  };
+  // Always advertise the default model first, with its canonical casing.
+  addModel(DEFAULT_MODEL);
   for (const k of Object.keys(env || {})) {
     if (!k.startsWith('ENDPOINT_') || k === 'ENDPOINT_ID') continue;
-    // Reverse the normalization : ENDPOINT_AURA_4O_REBIRTH_GEMMA_4_31B -> Aura-4o-Rebirth-Gemma-4-31B
-    // Best effort : we just lowercase + dash, the canonical ids are documented separately.
+    // Reverse the normalization : ENDPOINT_AURA_4O_REBIRTH_GEMMA_4_31B -> Aura-4o-Rebirth-Gemma-4-31b
+    // Case-insensitive dedup ensures the canonical DEFAULT_MODEL casing wins.
     const id = k.slice('ENDPOINT_'.length).split('_').map(s => s.charAt(0) + s.slice(1).toLowerCase()).join('-');
-    models.push({ id, object: 'model', created, owned_by: 'sevenofnine' });
-  }
-  // Always advertise the default model, even if no per-model env var exists.
-  if (!models.find(m => m.id === DEFAULT_MODEL)) {
-    models.unshift({ id: DEFAULT_MODEL, object: 'model', created, owned_by: 'sevenofnine' });
+    addModel(id);
   }
   return jsonResponse({ object: 'list', data: models });
 }
